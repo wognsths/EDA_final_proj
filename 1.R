@@ -5,7 +5,7 @@ install.packages("tigris")
 library(tidycensus);library(tidyverse)
 census_api_key("063a351b77e62241183d588c1af4109e63b2def2", install = TRUE)
 
-year <- 2022
+year <- 2024
 variables <- c(
   total_population = "B01003_001",
   median_age = "B01002_001",
@@ -32,3 +32,4 @@ ggplot(state_data_wide, aes(x = total_population, y = median_income)) +
     y = "중위 소득 (USD)"
   ) +
   theme_minimal()
+
