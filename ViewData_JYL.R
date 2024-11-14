@@ -71,3 +71,10 @@ ggplot(data = crime_2023_color, aes(x = LON, y = LAT, color = color_group)) +
 # 가장 위험하다고 판단한 지역의 발생 범죄 구성 보기
 View(crime_2023 %>% filter(AREA.NAME == "Pacific") %>% group_by(Crm.Cd.Desc) %>%
   summarise(count = n()))
+
+# 월별 범죄 발생률의 차이 (생각보다 없음! ^^)
+crime_2023 %>% group_by(month) %>% summarise(count = n()) %>% mutate(percent = (count / nrow(crime_2023)))
+ 
+# 각 범죄별 발생 빈도수
+crime_2023 %>% group_by(Crm.Cd.Desc) %>% summarise(count = n()) %>% 
+  mutate(percent = count / nrow(crime_2023)) %>% arrange(desc(count))
