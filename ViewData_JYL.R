@@ -127,3 +127,54 @@ ggplot(data = crime_2023_color, aes(x = LON, y = LAT, color = color_group)) +
     "other" = "grey"  
   )) +
   labs(color = "Area Group")
+
+crime_2023 %>% select(Status.Desc) %>% unique()
+crime_2023 %>% filter(Status.Desc == "UNK") %>% count()
+crime_2023 %>% group_by(Status.Desc) %>% count()
+
+crime_2023 %>% select(Premis.Desc) %>% unique() %>% nrow()
+crime_2023 %>% select(Crm.Cd.Desc) %>% unique() %>% nrow()
+crime_2023 %>% select(Crm.Cd) %>% unique() %>% nrow()
+
+crime_2023 %>% select(Crm.Cd) %>% unique() 
+
+# only includes the serious part1 crime in this part
+# we put others as Part2Crime
+# 그럼 part 1 crime에 focus 를 해서 접근하는 것은 어떠한지!!
+crime_2023_CD <- crime_2023 %>% mutate(
+  Crm.Cd.Group = case_when(
+    Crm.Cd %in% c(110,113) ~ "HOMICIDE",
+    Crm.Cd %in% c(121,122,815,820,821) ~ "RAPE",
+    Crm.Cd %in% c(210,220) ~ "ROBBERY",
+    Crm.Cd %in% c(230,231,235,236,250,251,761,926) ~ "AGG.ASSAULTS",
+    Crm.Cd %in% c(435,436,437,622,624,625,626,627,647,763,928,930) ~ "SIM.ASSAULTS",
+    Crm.Cd %in% c(310,320) ~ "BURGLARY",
+    Crm.Cd %in% c(510,520,433) ~ "VEICHLE.THEFT",
+    Crm.Cd %in% c(330,331,410,420,421) ~ "BURG.THEFT.FROMVEICHLE",
+    Crm.Cd %in% c(350,351,352,353,450,451,452,453) ~ "PERSONAL.THEFT",
+    Crm.Cd %in% c(341,343,345,440,441,442,443,444,445,470,471,472,473,474,475,480,485,487,491) ~ "OTHER.THEFT",
+    TRUE ~ "Part2Crime"
+    
+  )
+) 
+
+crime_2023_CD %>% group_by(Crm.Cd.Group) %>% count() 
+crime_2023_CD %>% filter(is.na(Crm.Cd.Group)) %>% select(Crm.Cd) %>% head(10)
+crime_2023_CD %>% filter(Crm.Cd == 662) %>% select(Crm.Cd.Desc) %>% head(10)
+crime_2023_CD %>% filter(is.na(Crm.Cd.Group)) %>% select(Crm.Cd) %>% unique() %>% nrow()
+
+crime_2023_CD %>% filter(is.na(Crm.Cd.Group)) %>% select(Crm.Cd.Desc) %>% unique() %>% head(10)
+
+crime_2023_CD %>% colnames()
+crime_2023_CD %>% filter(Crm.Cd == 662) %>% select(Part.1.2) %>% count()
+crime_2023_CD %>% filter(Crm.Cd.Group == "Part2Crime") %>% group_by(Part.1.2) %>% count()
+crime_2023_CD %>% group_by(Part.1.2) %>% count()
+crime_2023_CD %>% filter(Crm.Cd.Group != "Part2Crime") %>% group_by(Part.1.2) %>% count()
+crime_2023_CD %>% filter(Crm.Cd.Group != "Part2Crime" & Part.1.2 == 2) %>% group_by(Crm.Cd.Group) %>% count()
+# simple assault 만 뺴주면 위에 내용들은 모두 part 1 crime에 포함이 된다.
+
+crime_2023_CD %>% filter(Crm.Cd.Group == "Part2Crime" & Part.1.2 == 1) %>% select(Crm.Cd.Desc) %>% unique()
+crime_2023_CD %>% filter(Crm.Cd.Group == "Part2Crime" & Part.1.2 == 1) %>% select(Crm.Cd) %>% unique()
+# Arson <- 방화;Veichle stolen 이거 두개만 추가해주면 순수 part 1 crime 모두 정리하기 가능!
+
+
