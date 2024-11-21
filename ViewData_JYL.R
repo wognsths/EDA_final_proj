@@ -1,5 +1,4 @@
-library(tidyverse)
-library(stringr)
+library(tidyverse); library(stringr);library(sf);
 
 # crime <- read.csv("Crime_Data_from_2020_to_Present.csv")
 # 
@@ -78,3 +77,53 @@ crime_2023 %>% group_by(month) %>% summarise(count = n()) %>% mutate(percent = (
 # 각 범죄별 발생 빈도수
 crime_2023 %>% group_by(Crm.Cd.Desc) %>% summarise(count = n()) %>% 
   mutate(percent = count / nrow(crime_2023)) %>% arrange(desc(count))
+
+# shapefile <- st_read("Median_Income_and_AMI_(census_tract).shp")
+# 
+# ggplot(data = shapefile) +
+#   geom_sf() +
+#   labs(title = "Map of Shapefile Data") +
+#   theme_minimal()
+# 
+# shapeshape <- st_centroid(shapefile)
+# shapeshape
+# 
+# shapeshape <- shapeshape %>%
+#   mutate(longitude = st_coordinates(.)[,1],
+#          latitude = st_coordinates(.)[,2])
+# ggplot() +
+#   geom_sf(data = shapeshape, fill = NA, color = "grey") + # Plot the map boundaries
+#   geom_point(data = shapeshape, aes(x = longitude, y = latitude), color = "blue") +
+#   labs(title = "Points on Map") +
+#   theme_minimal()
+
+add_draw
+crime_2023_color[c("LON","LAT")]
+
+lapd_areas <- st_read("LAPD_Div/LAPD_Divisions.shp")
+lapd_areas %>% unique
+add_draw["AREA.NAME"] %>% unique
+boundary <- st_as_sf(lapd_areas)
+boundary <- st_transform(boundary, crs = 4326)
+
+add_draw <- st_as_sf(crime_2023_color,coords = c("LON","LAT"),crs = st_crs(boundary))
+add_draw
+# Coordinate Reference Systems (CRS)
+
+boundary <- st_transform(boundary, crs = 4326)
+
+ggplot() +
+  geom_sf(data = boundary, fill = NA, color = "black") +
+  geom_sf(data = add_draw, aes(color =color_group), size = 0.1) +
+  labs(title = "Boundary with Latitude and Longitude")
+
+
+
+ggplot(data = crime_2023_color, aes(x = LON, y = LAT, color = color_group)) +
+  geom_point(size = 0.3, alpha = 0.5) +
+  scale_color_manual(values = c(
+    "blue" = "blue",
+    "red" = "red",
+    "other" = "grey"  
+  )) +
+  labs(color = "Area Group")
