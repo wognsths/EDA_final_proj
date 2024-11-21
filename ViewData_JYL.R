@@ -1,6 +1,14 @@
 library(tidyverse); library(stringr);library(sf);
 
-# crime <- read.csv("Crime_Data_from_2020_to_Present.csv")
+crime <- read.csv("Crime_Data_from_2020_to_Present.csv")
+crime %>% group_by(Status.Desc) %>% count()
+
+crime %>% colnames()
+crime %>% select(Status.Desc) %>% head()
+crime %>% filter(Part.1.2 == 1) %>% group_by(Status.Desc) %>% count()
+crime %>% filter(Part.1.2 == 2) %>% group_by(Status.Desc) %>% count()
+crime %>% group_by(Part.1.2) %>% count()
+
 # 
 # crime %>% names()
 # 
@@ -175,6 +183,10 @@ crime_2023_CD %>% filter(Crm.Cd.Group != "Part2Crime" & Part.1.2 == 2) %>% group
 
 crime_2023_CD %>% filter(Crm.Cd.Group == "Part2Crime" & Part.1.2 == 1) %>% select(Crm.Cd.Desc) %>% unique()
 crime_2023_CD %>% filter(Crm.Cd.Group == "Part2Crime" & Part.1.2 == 1) %>% select(Crm.Cd) %>% unique()
+
 # Arson <- 방화;Veichle stolen 이거 두개만 추가해주면 순수 part 1 crime 모두 정리하기 가능!
+# 648 <- 방화 ; 522 <- 차량 도둑
+
+crime_2023_CD %>% filter(Crm.Cd == 648)
 
 
