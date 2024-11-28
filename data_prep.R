@@ -32,7 +32,7 @@ CD <- Crime_Data %>%
     ),
     hour = floor(as.numeric(`TIME OCC`) / 100)
   ) %>% filter(OCC_year == 2023) %>%
-  select(., -c('DR_NO', `Date Rptd`, `DATE OCC`, 
+  select(., -c('DR_NO', `Date Rptd`, `DATE OCC`, `TIME OCC`,
                'AREA', `Rpt Dist No`, `Part 1-2`, `Crm Cd`, `Crm Cd Desc`,
                'Mocodes', 'Status', `Status Desc`, `Crm Cd 1`, `Crm Cd 2`,
                `Crm Cd 3`, `Crm Cd 4`, 'LOCATION', `Cross Street`, 'OCC_year',
@@ -56,7 +56,6 @@ MosaicData_Loader <- function() {
     select(., c(Severity, weapon_usage, crime_status, vict_sex, `AREA NAME`)) -> Mosaic.CD
   return(Mosaic.CD)
 }
-
 
 ### Other Functions / Data Tables for Data Analysis ###
 
