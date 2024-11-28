@@ -32,28 +32,46 @@ Distance_Calculator <- function(Criteria_point, Data, option = 2) {
   Data <- as.matrix(Data)
   Criteria_point <- as.matrix(Criteria_point)
   
-  n <- nrow(Data)
-  m <- nrow(Criteria_point)
+  # Scaling factors
+  
+  Point_for_real_dist <- Data %>% apply(., 2, range) %>% apply(.,2,mean)
+  
+  lat_scale <- 111.32  # km per degree latitude
+  lon_scale <- 111.32 * cos(Point_for_real_dist[2] * pi / 180)  # km per degree longitude
+  
+  # Apply scaling to Data and Criteria_point
+  Data_scaled <- Data
+  Data_scaled[, 1] <- Data[, 1] * lat_scale     # Scale latitude
+  Data_scaled[, 2] <- Data[, 2] * lon_scale     # Scale longitude
+  
+  Criteria_scaled <- Criteria_point
+  Criteria_scaled[, 1] <- Criteria_point[, 1] * lat_scale
+  Criteria_scaled[, 2] <- Criteria_point[, 2] * lon_scale
+  
+  n <- nrow(Data_scaled)
+  m <- nrow(Criteria_scaled)
   
   if (option == 2) {
-    Data_norms <- rowSums(Data^2)
-    Criteria_norms <- rowSums(Criteria_point^2)
-    Cross_prod <- Data %*% t(Criteria_point)
+    # Euclidean distance
+    Data_norms <- rowSums(Data_scaled^2)
+    Criteria_norms <- rowSums(Criteria_scaled^2)
+    Cross_prod <- Data_scaled %*% t(Criteria_scaled)
     
     Distance_sq <- outer(Data_norms, rep(1, m)) + 
       outer(rep(1, n), Criteria_norms) - 2 * Cross_prod
-
-    Distance_sq[Distance_sq < 0] <- 0
-
+    
+    Distance_sq[Distance_sq < 0] <- 0  # Correct for numerical errors
+    
     Distance <- sqrt(Distance_sq)
     return(Distance)
     
   } else if (option == 1) {
-    p <- ncol(Data)
+    # Manhattan distance
+    p <- ncol(Data_scaled)
     Distance <- matrix(0, n, m)
     
     for (k in 1:p) {
-      Distance <- Distance + abs(outer(Data[, k], Criteria_point[, k], "-"))
+      Distance <- Distance + abs(outer(Data_scaled[, k], Criteria_scaled[, k], "-"))
     }
     return(Distance)
     
@@ -71,3 +89,6 @@ Dist_matrix <- Distance_Calculator(Criteria_point, Data, 1)
 
 Dist_matrix %>% apply(., 1, min) %>% as.data.frame() %>%
   ggplot(., aes(x = .)) + geom_density()
+
+
+
