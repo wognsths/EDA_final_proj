@@ -17,8 +17,28 @@ CD <- Crime_Data %>%
     crime_status = ifelse(`Status Desc` %like% "Juv", "Juvenile", 
                           ifelse(`Status Desc` %like% "Adult", "Adult", NA)),
     vict_sex = ifelse(((`Vict Sex` == "-") | (`Vict Sex` == "X") | (`Vict Sex` == "")), NA, `Vict Sex`),
-    
-  ) %>% filter(OCC_year == 2023)
+    Crm.Cd.Group = case_when(
+      `Crm Cd` %in% c(110,113) ~ "HOMICIDE",
+      `Crm Cd` %in% c(121,122,815,820,821) ~ "RAPE",
+      `Crm Cd` %in% c(210,220) ~ "ROBBERY",
+      `Crm Cd` %in% c(230,231,235,236,250,251,761,926) ~ "AGG.ASSAULTS",
+      `Crm Cd` %in% c(435,436,437,622,624,625,626,627,647,763,928,930) ~ "SIM.ASSAULTS",
+      `Crm Cd` %in% c(310,320) ~ "BURGLARY",
+      `Crm Cd` %in% c(510,520,433) ~ "VEICHLE.THEFT",
+      `Crm Cd` %in% c(330,331,410,420,421) ~ "BURG.THEFT.FROMVEICHLE",
+      `Crm Cd` %in% c(350,351,352,353,450,451,452,453) ~ "PERSONAL.THEFT",
+      `Crm Cd` %in% c(341,343,345,440,441,442,443,444,445,470,471,472,473,474,475,480,485,487,491) ~ "OTHER.THEFT",
+      TRUE ~ "Part2Crime"
+    ),
+    hour = floor(as.numeric(`TIME OCC`) / 100)
+  ) %>% filter(OCC_year == 2023) %>%
+  select(., -c('DR_NO', `Date Rptd`, `DATE OCC`, 
+               'AREA', `Rpt Dist No`, `Part 1-2`, `Crm Cd`, `Crm Cd Desc`,
+               'Mocodes', 'Status', `Status Desc`, `Crm Cd 1`, `Crm Cd 2`,
+               `Crm Cd 3`, `Crm Cd 4`, 'LOCATION', `Cross Street`, 'OCC_year'))
+
+CD %>% colnames()
+
 
 ### DATALOADER ###
 GeoData_Loader <- function() {
