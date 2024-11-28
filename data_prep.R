@@ -16,12 +16,20 @@ CD <- Crime_Data %>%
     weapon_usage = ifelse(is.na(`Weapon Used Cd`), "No", "Yes"),
     crime_status = ifelse(`Status Desc` %like% "Juv", "Juvenile", 
                           ifelse(`Status Desc` %like% "Adult", "Adult", NA)),
-    vict_sex = ifelse(((`Vict Sex` == "-") | (`Vict Sex` == "X") | (`Vict Sex` == "")), NA, `Vict Sex`)
+    vict_sex = ifelse(((`Vict Sex` == "-") | (`Vict Sex` == "X") | (`Vict Sex` == "")), NA, `Vict Sex`),
+    
   ) %>% filter(OCC_year == 2023)
 
 ### DATALOADER ###
 GeoData_Loader <- function() {
-  CD %>% filter(LAT != 0, LON != 0, `Dur Rptd` > 0) -> Geo.CD
+  CD %>% 
+    filter(LAT != 0, LON != 0, `Dur Rptd` > 0) -> Geo.CD
+  
+  PD_data <- Police_station %>% select(., c(latitude, longitude))
+  Geo.CD %>% mutate(
+    L1_dist = Distance_Calculator(PD_data, Geo.CD %>% select(.,c(LAT, LON)), 1) %>% apply(.,1,min),
+    L2_dist = Distance_Calculator(PD_data, Geo.CD %>% select(.,c(LAT, LON)), 2) %>% apply(.,1,min)
+  ) -> Geo.CD
   return(Geo.CD)
 }
 
