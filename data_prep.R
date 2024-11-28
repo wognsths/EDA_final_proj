@@ -35,7 +35,8 @@ CD <- Crime_Data %>%
   select(., -c('DR_NO', `Date Rptd`, `DATE OCC`, 
                'AREA', `Rpt Dist No`, `Part 1-2`, `Crm Cd`, `Crm Cd Desc`,
                'Mocodes', 'Status', `Status Desc`, `Crm Cd 1`, `Crm Cd 2`,
-               `Crm Cd 3`, `Crm Cd 4`, 'LOCATION', `Cross Street`, 'OCC_year'))
+               `Crm Cd 3`, `Crm Cd 4`, 'LOCATION', `Cross Street`, 'OCC_year',
+               `Premis Cd`, `Premis Desc`, `Weapon Desc`, `Weapon Used Cd`))
 
 ### DATALOADER ###
 GeoData_Loader <- function() {
@@ -110,4 +111,3 @@ Distance_Calculator <- function(Criteria_point, Data, option = 2) {
     stop("Invalid option. Choose 1 for Manhattan distance or 2 for Euclidean distance.")
   }
 }
-
