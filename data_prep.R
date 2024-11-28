@@ -30,7 +30,13 @@ CD <- Crime_Data %>%
       `Crm Cd` %in% c(341,343,345,440,441,442,443,444,445,470,471,472,473,474,475,480,485,487,491) ~ "OTHER.THEFT",
       TRUE ~ "Part2Crime"
     ),
-    hour = floor(as.numeric(`TIME OCC`) / 100)
+    hour = floor(as.numeric(`TIME OCC`) / 100),
+    `AREA NAME` = toupper(`AREA NAME`),
+    `AREA NAME` = case_when(
+      `AREA NAME` == "N HOLLYWOOD" ~ "NORTH HOLLYWOOD",
+      `AREA NAME` == "WEST LA" ~ "WEST LOS ANGELES",
+      TRUE ~ `AREA NAME`
+    )
   ) %>% filter(OCC_year == 2023) %>%
   select(., -c('DR_NO', `Date Rptd`, `DATE OCC`, `TIME OCC`,
                'AREA', `Rpt Dist No`, `Part 1-2`, `Crm Cd`, `Crm Cd Desc`,
