@@ -37,9 +37,6 @@ CD <- Crime_Data %>%
                'Mocodes', 'Status', `Status Desc`, `Crm Cd 1`, `Crm Cd 2`,
                `Crm Cd 3`, `Crm Cd 4`, 'LOCATION', `Cross Street`, 'OCC_year'))
 
-CD %>% colnames()
-
-
 ### DATALOADER ###
 GeoData_Loader <- function() {
   CD %>% 
@@ -60,7 +57,7 @@ MosaicData_Loader <- function() {
 }
 
 
-### Other Functions for Data Analysis ###
+### Other Functions / Data Tables for Data Analysis ###
 
 Distance_Calculator <- function(Criteria_point, Data, option = 2) {
   Data <- as.matrix(Data)
