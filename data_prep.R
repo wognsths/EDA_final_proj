@@ -37,7 +37,7 @@ CD <- Crime_Data %>%
       `AREA NAME` == "WEST LA" ~ "WEST LOS ANGELES",
       TRUE ~ `AREA NAME`
     )
-  ) %>% filter(OCC_year == 2023) %>%
+  ) %>% filter(OCC_year == 2023, LAT != 0, LON != 0, `Dur Rptd` >= 0) %>%
   select(., -c('DR_NO', `Date Rptd`, `DATE OCC`, `TIME OCC`,
                'AREA', `Rpt Dist No`, `Part 1-2`, `Crm Cd`, `Crm Cd Desc`,
                'Mocodes', 'Status', `Status Desc`, `Crm Cd 1`, `Crm Cd 2`,
@@ -47,7 +47,7 @@ CD <- Crime_Data %>%
 ### DATALOADER ###
 GeoData_Loader <- function() {
   CD %>% 
-    filter(LAT != 0, LON != 0, `Dur Rptd` > 0) -> Geo.CD
+    filter(LAT != 0, LON != 0, `Dur Rptd` >= 0) -> Geo.CD
   
   PD_data <- Police_station %>% select(., c(latitude, longitude))
   Geo.CD %>% mutate(

@@ -15,7 +15,7 @@ ui <- navbarPage(
           inputId = "start_dur",
           label = "Start Point (Minimum Value of Duration Reported (Unit: days)):",
           value = 7,
-          min = 1,
+          min = 0,
           step = 7
         ),
         checkboxInput(
