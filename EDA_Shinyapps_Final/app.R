@@ -4,66 +4,92 @@ source("~/EDA_final_proj/data_prep.R")
 Geo.CD <- GeoData_Loader()
 Mosaic.CD <- MosaicData_Loader()
 
-ui <- fluidPage(
-  titlePanel("Analysis of Crime Data Based on Duration of Reported Range"),
-  sidebarLayout(
-    sidebarPanel(
-      numericInput(
-        inputId = "start_dur",
-        label = "Start Point (Minimum Value of Duration Reported (Unit: days)):",
-        value = 7,
-        min = 1,
-        step = 7
-      ),
-      checkboxInput(
-        inputId = "use_end",
-        label = "Select Option (End point)",
-        value = FALSE
-      ),
-      conditionalPanel(
-        condition = "input.use_end == true",
+ui <- navbarPage(
+  "Analysis of Crime Data in 2023, LA",
+  # Page 1
+  tabPanel(
+    "Page 1",
+    sidebarLayout(
+      sidebarPanel(
         numericInput(
-          inputId = "end_dur",
-          label = "End Point (Maximum Value of Duration Reported (Unit: days)):",
-          value = 21,
+          inputId = "start_dur",
+          label = "Start Point (Minimum Value of Duration Reported (Unit: days)):",
+          value = 7,
           min = 1,
           step = 7
-        )
-      ),
-      checkboxInput(
-        inputId = "heatmap",
-        label = "Show Heatmap",
-        value = FALSE
-      ),
-      checkboxInput(
-        inputId = "crime_percentage_plot_show",
-        label = "Crime Percentages by Area",
-        value = TRUE
-      ),
-      checkboxInput(
-        inputId = "crime_dist_plot_show",
-        label = "Distance Between Location of Crime and Nearest Police Station",
-        value = FALSE
-      ),
-      conditionalPanel(
-        condition = "input.crime_dist_plot_show == true",
-        div(style = "margin-left: 20px;",
+        ),
+        checkboxInput(
+          inputId = "use_end",
+          label = "Select Option (End point)",
+          value = FALSE
+        ),
+        conditionalPanel(
+          condition = "input.use_end == true",
+          numericInput(
+            inputId = "end_dur",
+            label = "End Point (Maximum Value of Duration Reported (Unit: days)):",
+            value = 21,
+            min = 0,
+            step = 7
+          )
+        ),
+        checkboxInput(
+          inputId = "heatmap",
+          label = "Show Heatmap",
+          value = FALSE
+        ),
+        conditionalPanel(
+          condition = "input.heatmap == true",
+          checkboxGroupInput(
+            inputId = "heatmap_options",
+            label = "Options:",
+            choices = list("Option1" = "option1", "Option2" = "option2", "Option3" = "option3")
+          )
+        ),
+        checkboxInput(
+          inputId = "crime_percentage_plot_show",
+          label = "Crime Percentages by Area",
+          value = TRUE
+        ),
+        checkboxInput(
+          inputId = "crime_dist_plot_show",
+          label = "Distance Between Crime Location and Nearest Police Station",
+          value = FALSE
+        ),
+        conditionalPanel(
+          condition = "input.crime_dist_plot_show == true",
+          div(
+            style = "margin-left: 20px;",
             checkboxInput(
               inputId = "metric",
               label = "Calculate distance by L2 Metric (Default: L1 Metric)",
               value = FALSE
             )
+          )
         )
+      ),
+      mainPanel(
+        plotOutput("crimePlot", width = "100%", height = "600px"),
+        textOutput("crimeStats"),
+        plotOutput("optionPlot")
       )
-    ),
-    mainPanel(
-      plotOutput("crimePlot", width = "100%", height = "600px"),
-      textOutput("crimeStats"),
-      plotOutput("optionPlot")
     )
+  ),
+  
+  # Page 2
+  tabPanel(
+    "Page 2",
+    h3("Page 2 Content Goes Here"),
+    # Add your content for Page 2 here
+  ),
+  
+  # Page 3
+  tabPanel(
+    "Page 3",
+    h3("Page 3 Content Goes Here"),
+    # Add your content for Page 3 here
   )
 )
-
 
 server <- function(input, output, session) {
   observe({
@@ -84,16 +110,25 @@ server <- function(input, output, session) {
     }
   })
   
-  filteredData <- reactive({
+  filteredData.Geo <- reactive({
     start_value <- input$start_dur
-    end_value <- if (input$use_end) input$end_dur else max(Cd$`Dur Rptd`, na.rm = TRUE)
+    end_value <- if (input$use_end) input$end_dur else max(CD$`Dur Rptd`, na.rm = TRUE)
     
     Geo.CD %>%
       filter(`Dur Rptd` >= start_value & `Dur Rptd` <= end_value)
   })
   
+  filteredData <- reactive({
+    start_value <- input$start_dur
+    end_value <- if (input$use_end) input$end_dur else max(CD$`Dur Rptd`, na.rm = TRUE)
+    
+    CD %>%
+      filter(`Dur Rptd` >= start_value & `Dur Rptd` <= end_value)
+  })
+  
   output$crimePlot <- renderPlot({
     Cd_filtered <- filteredData()
+    Cd_filtered.Geo <- filteredData.Geo()
     
     Title <- ifelse(input$heatmap, "Heatmap", "Scatterplot")
     
@@ -105,7 +140,7 @@ server <- function(input, output, session) {
           input$start_dur,
           if (input$use_end) paste0(" to ", input$end_dur, " Days") else " Days and Above"
         ),
-        x = "Longtitude",
+        x = "Longitude",
         y = "Latitude",
       ) +
       theme_minimal() +
@@ -122,7 +157,7 @@ server <- function(input, output, session) {
     } else {
       base_plot <- base_plot +
         geom_sf(data = boundary, fill = NA, color = "black") +
-        geom_point(data = Cd_filtered, aes(x = LON, y = LAT), alpha = 0.5, size = 0.5)
+        geom_point(data = Cd_filtered.Geo, aes(x = LON, y = LAT), alpha = 0.5, size = 0.5)
       print(base_plot)
     }
   })
@@ -134,12 +169,15 @@ server <- function(input, output, session) {
     selected_crimes <- nrow(Cd_filtered)
     percentage <- round((selected_crimes / total_crimes) * 100, 2)
     
-    paste0("Crime Count in Selected Interval: ", selected_crimes, "\n\n",
-           "Percentage of Total Crimes: ", percentage, "%")
+    paste0(
+      "Crime Count in Selected Interval: ", selected_crimes, "\n\n",
+      "Percentage of Total Crimes: ", percentage, "%"
+    )
   })
   
   output$optionPlot <- renderPlot({
     Cd_filtered <- filteredData()
+    Cd_filtered.Geo <- filteredData.Geo()
     
     if (input$crime_percentage_plot_show) {
       total_area_counts <- CD %>%
@@ -153,7 +191,7 @@ server <- function(input, output, session) {
       area_data <- full_join(total_area_counts, selected_area_counts, by = "AREA NAME")
       area_data[is.na(area_data)] <- 0
       
-      summed <- apply(area_data %>% .[,c(2,3)], 2, sum)
+      summed <- apply(area_data %>% .[, c(2, 3)], 2, sum)
       
       total_crimes <- summed[1]
       selected_crimes <- summed[2]
@@ -167,9 +205,11 @@ server <- function(input, output, session) {
         select(`AREA NAME`, selected_percentage, area_percentage) %>%
         gather(key = "Metric", value = "Value", -`AREA NAME`)
       
-      area_data_long$Metric <- recode(area_data_long$Metric,
-                                      "selected_percentage" = "Percentage of Selected Crimes",
-                                      "area_percentage" = "Percentage within Area")
+      area_data_long$Metric <- recode(
+        area_data_long$Metric,
+        "selected_percentage" = "Percentage of Selected Crimes",
+        "area_percentage" = "Percentage within Area"
+      )
       areaplot <- ggplot(area_data_long, aes(x = reorder(`AREA NAME`, -Value), y = Value, fill = Metric)) +
         geom_bar(position = "dodge", stat = "identity") +
         labs(
@@ -185,20 +225,16 @@ server <- function(input, output, session) {
       print(areaplot)
     } else {
       if (input$metric) {
-        Distplot <- Cd_filtered %>% ggplot(., aes(x = L2_dist)) +
+        Distplot <- Cd_filtered.Geo %>% ggplot(., aes(x = L2_dist)) +
           geom_density()
       } else {
-        Distplot <- Cd_filtered %>% ggplot(., aes(x = L1_dist)) +
+        Distplot <- Cd_filtered.Geo %>% ggplot(., aes(x = L1_dist)) +
           geom_density()
       }
       print(Distplot)
     }
-    
-    
   })
-  
 }
-
 
 # Run the application 
 shinyApp(ui = ui, server = server)
