@@ -4,6 +4,7 @@ source("~/EDA_final_proj/data_prep.R")
 Geo.CD <- GeoData_Loader()
 Mosaic.CD <- MosaicData_Loader()
 crime_groups_choices <- Geo.CD$Crm.Cd.Group %>% unique() %>% sort()
+AREA_NAME <- Mosaic.CD$`AREA NAME` %>% unique()
 
 ui <- navbarPage(
   "Analysis of Crime Data in 2023, LA",
@@ -106,14 +107,27 @@ ui <- navbarPage(
         radioButtons(
           inputId = "additionalplots",
           label = "Select Plots",
-          choices = c(
-            "Mosaic Plot",
-            "Piechart"
+          choices = list(
+            "Mosaic Plot" = "mosaic",
+            "Piechart" = "pie"
           )
+        ),
+        conditionalPanel(
+          condition = "input.additionalplots == 'mosaic'",
+          checkboxGroupInput(
+            inputId = "selected_areas", 
+            label = "Select Area(s):", 
+            choices = AREA_NAME,
+            selected = AREA_NAME
+          ),
+          actionButton("select_all", "Select All Areas"),
+          actionButton("clear_selection", "Clear Selection")
         )
       ),
       mainPanel(
-        h3("Page 2 Content Goes Here"),
+        plotOutput("additionalPlot1"),
+        plotOutput("additionalPlot2"),
+        plotOutput("additionalPlot3")
       )
     )
   ),
@@ -127,7 +141,7 @@ ui <- navbarPage(
 )
 
 server <- function(input, output, session) {
-  
+  ## PAGE 1
   observe({
     if (input$use_end && input$end_dur < input$start_dur) {
       updateNumericInput(session, "end_dur", value = input$start_dur)
@@ -285,6 +299,61 @@ server <- function(input, output, session) {
       }
       print(Distplot)
     }
+  })
+  
+  ## PAGE 2 ##
+  
+  observeEvent(input$select_all, {
+    updateCheckboxGroupInput(session, "selected_areas", 
+                             selected = AREA_NAME)
+  })
+  
+  observeEvent(input$clear_selection, {
+    updateCheckboxGroupInput(session, "selected_areas", 
+                             selected = character(0))
+  })
+  filteredData.Page2 <- reactive({
+    if (length(input$selected_areas) == 0) {
+      return(Mosaic.CD)
+    } else {
+      return(Mosaic.CD %>% data.table %>% .[`AREA NAME` %in% input$selected_areas])
+    }
+  })
+  
+  output$additionalPlot1 <- renderPlot({
+    if (input$additionalplots == "mosaic") {
+      vict_sex_data <- filteredData.Page2()[!is.na(vict_sex)] %>% .[, vict_sex := as.factor(vict_sex)]
+      
+      plot <- ggplot(data = vict_sex_data) +
+        geom_mosaic(aes(x = product(Severity, vict_sex), 
+                        fill = Severity)) +
+        scale_fill_manual(values = c("turquoise3", "orange2")) +
+        labs(x = "Victim Sex", 
+             y = "Severity", 
+             title = ifelse(
+               length(input$selected_areas) == length(AREA_NAME), 
+               "Victim Sex vs Severity in All Areas", 
+               paste("Victim Sex vs Severity in", paste(input$selected_areas, collapse = ", "))
+             )) +
+        theme_mosaic()
+    }
+    print(plot)
+  })
+  
+  output$additionalPlot2 <- renderPlot({
+    plot <- ggplot()
+    if (input$additionalplots == "mosaic") {
+      
+    }
+    print(plot)
+  })
+  
+  output$additionalPlot3 <- renderPlot({
+    plot <- ggplot()
+    if (input$additionalplots == "mosaic") {
+      
+    }
+    print(plot)
   })
 }
 

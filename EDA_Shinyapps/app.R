@@ -2,7 +2,7 @@ library(shiny)
 library(tidyverse)
 library(ggplot2)
 library(sf)
-
+source("~/EDA_final_proj/data_prep.R")
 # Read in crime data
 Crime_Data <- read_csv("Crime_Data_from_2020_to_Present.csv")
 
@@ -20,9 +20,7 @@ Cd <- Crime_Data %>%
     `Dur Rptd` > 0
   )
 
-# Read in LAPD division boundaries
 boundary <- st_read("LAPD_Div/LAPD_Divisions.shp")
-# Transform boundary CRS to match crime data CRS
 boundary <- st_transform(boundary, crs = 4326)
 
 ui <- fluidPage(

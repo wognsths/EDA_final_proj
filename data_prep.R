@@ -1,5 +1,6 @@
 ## This file is for data analysis & data loaders
-library(tidyverse);library(ggplot2);library(sf);library(lubridate);library(data.table);library(RColorBrewer)
+library(tidyverse);library(ggplot2);library(sf);library(lubridate)
+library(data.table);library(RColorBrewer);library(ggmosaic)
 
 Crime_Data <- read_csv("Crime_Data_from_2020_to_Present.csv")
 Police_station <- read_csv("~/EDA_final_proj/Sheriff_and_Police_Stations.csv")
@@ -59,7 +60,7 @@ GeoData_Loader <- function() {
 
 MosaicData_Loader <- function() {
   CD %>% 
-    select(., c(Severity, weapon_usage, crime_status, vict_sex, `AREA NAME`)) -> Mosaic.CD
+    select(., c(Severity, weapon_usage, crime_status, vict_sex, `AREA NAME`, `Dur Rptd`)) -> Mosaic.CD
   return(Mosaic.CD)
 }
 
