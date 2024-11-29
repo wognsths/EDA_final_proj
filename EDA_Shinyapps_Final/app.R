@@ -3,6 +3,7 @@ source("~/EDA_final_proj/data_prep.R")
 
 Geo.CD <- GeoData_Loader()
 Mosaic.CD <- MosaicData_Loader()
+crime_groups_choices <- Geo.CD$Crm.Cd.Group %>% unique() %>% sort()
 
 ui <- navbarPage(
   "Analysis of Crime Data in 2023, LA",
@@ -11,6 +12,13 @@ ui <- navbarPage(
     "Page 1",
     sidebarLayout(
       sidebarPanel(
+        selectInput(
+          inputId = "crime_types",
+          label = "Select Crime Types:",
+          choices = crime_groups_choices,
+          selected = crime_groups_choices,
+          multiple = TRUE
+        ),
         numericInput(
           inputId = "start_dur",
           label = "Start Point (Minimum Value of Duration Reported (Unit: days)):",
@@ -40,10 +48,10 @@ ui <- navbarPage(
         ),
         conditionalPanel(
           condition = "input.heatmap == true",
-          checkboxGroupInput(
-            inputId = "heatmap_options",
-            label = "Options:",
-            choices = list("Option1" = "option1", "Option2" = "option2", "Option3" = "option3")
+          radioButtons(inputId="choice", 
+                       label="What would you like to see?", 
+                       choices=c("Show Crime Count",
+                                 "")
           )
         ),
         checkboxInput(
@@ -110,25 +118,17 @@ server <- function(input, output, session) {
     }
   })
   
-  filteredData.Geo <- reactive({
-    start_value <- input$start_dur
-    end_value <- if (input$use_end) input$end_dur else max(CD$`Dur Rptd`, na.rm = TRUE)
-    
-    Geo.CD %>%
-      filter(`Dur Rptd` >= start_value & `Dur Rptd` <= end_value)
-  })
-  
   filteredData <- reactive({
     start_value <- input$start_dur
     end_value <- if (input$use_end) input$end_dur else max(CD$`Dur Rptd`, na.rm = TRUE)
     
-    CD %>%
-      filter(`Dur Rptd` >= start_value & `Dur Rptd` <= end_value)
+    Geo.CD %>%
+      filter(`Dur Rptd` >= start_value & `Dur Rptd` <= end_value,
+             Crm.Cd.Group %in% input$crime_types)
   })
   
   output$crimePlot <- renderPlot({
     Cd_filtered <- filteredData()
-    Cd_filtered.Geo <- filteredData.Geo()
     
     Title <- ifelse(input$heatmap, "Heatmap", "Scatterplot")
     
@@ -147,17 +147,24 @@ server <- function(input, output, session) {
       coord_sf(expand = FALSE)
     
     if (input$heatmap) {
-      Total_count <- Cd_filtered %>% group_by(`AREA NAME`) %>% summarise(total_count = n())
+      if (input$choice == "Show Crime Count") {
+        Total_count <- Cd_filtered %>% group_by(`AREA NAME`) %>% summarise(total_count = n())
+        
+      } else if (input$choice == "") {
+        print("Yess")
+      }
+      
       bb <- left_join(boundary, Total_count, by = c("APREC" = "AREA NAME"))
       base_plot <- base_plot +
         geom_sf(data = bb, aes(fill = total_count), color = "black") +
         scale_fill_gradient(low = "white", high = "red", na.value = "grey50") +
         guides(fill = guide_colorbar(title = "Crime Count"))
       print(base_plot)
+      
     } else {
       base_plot <- base_plot +
         geom_sf(data = boundary, fill = NA, color = "black") +
-        geom_point(data = Cd_filtered.Geo, aes(x = LON, y = LAT), alpha = 0.5, size = 0.5)
+        geom_point(data = Cd_filtered, aes(x = LON, y = LAT), alpha = 0.5, size = 0.5)
       print(base_plot)
     }
   })
@@ -177,7 +184,6 @@ server <- function(input, output, session) {
   
   output$optionPlot <- renderPlot({
     Cd_filtered <- filteredData()
-    Cd_filtered.Geo <- filteredData.Geo()
     
     if (input$crime_percentage_plot_show) {
       total_area_counts <- CD %>%
@@ -225,10 +231,10 @@ server <- function(input, output, session) {
       print(areaplot)
     } else {
       if (input$metric) {
-        Distplot <- Cd_filtered.Geo %>% ggplot(., aes(x = L2_dist)) +
+        Distplot <- Cd_filtered %>% ggplot(., aes(x = L2_dist)) +
           geom_density()
       } else {
-        Distplot <- Cd_filtered.Geo %>% ggplot(., aes(x = L1_dist)) +
+        Distplot <- Cd_filtered %>% ggplot(., aes(x = L1_dist)) +
           geom_density()
       }
       print(Distplot)
