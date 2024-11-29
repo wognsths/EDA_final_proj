@@ -19,6 +19,20 @@ ui <- navbarPage(
           selected = crime_groups_choices,
           multiple = TRUE
         ),
+        selectInput(
+          inputId = "weapon_usage",
+          label = "Weapon Used:",
+          choices = c("Yes", "No"),
+          selected = c("Yes", "No"),
+          multiple = TRUE
+        ),
+        selectInput(
+          inputId = "severity",
+          label = "Severity:",
+          choices = c("Severe", "Less Severe"),
+          selected = c("Severe", "Less Severe"),
+          multiple = TRUE
+        ),
         numericInput(
           inputId = "start_dur",
           label = "Start Point (Minimum Value of Duration Reported (Unit: days)):",
@@ -51,7 +65,7 @@ ui <- navbarPage(
           radioButtons(inputId="choice", 
                        label="What would you like to see?", 
                        choices=c("Show Crime Count",
-                                 "")
+                                 "Show Crime Levels")
           )
         ),
         checkboxInput(
@@ -87,8 +101,21 @@ ui <- navbarPage(
   # Page 2
   tabPanel(
     "Page 2",
-    h3("Page 2 Content Goes Here"),
-    # Add your content for Page 2 here
+    sidebarLayout(
+      sidebarPanel(
+        radioButtons(
+          inputId = "additionalplots",
+          label = "Select Plots",
+          choices = c(
+            "Mosaic Plot",
+            "Piechart"
+          )
+        )
+      ),
+      mainPanel(
+        h3("Page 2 Content Goes Here"),
+      )
+    )
   ),
   
   # Page 3
@@ -100,6 +127,7 @@ ui <- navbarPage(
 )
 
 server <- function(input, output, session) {
+  
   observe({
     if (input$use_end && input$end_dur < input$start_dur) {
       updateNumericInput(session, "end_dur", value = input$start_dur)
@@ -124,7 +152,9 @@ server <- function(input, output, session) {
     
     Geo.CD %>%
       filter(`Dur Rptd` >= start_value & `Dur Rptd` <= end_value,
-             Crm.Cd.Group %in% input$crime_types)
+             Crm.Cd.Group %in% input$crime_types,
+             `weapon_usage` %in% input$weapon_usage,
+             Severity %in% input$severity)
   })
   
   output$crimePlot <- renderPlot({
@@ -150,15 +180,28 @@ server <- function(input, output, session) {
       if (input$choice == "Show Crime Count") {
         Total_count <- Cd_filtered %>% group_by(`AREA NAME`) %>% summarise(total_count = n())
         
-      } else if (input$choice == "") {
-        print("Yess")
+        bb <- left_join(boundary, Total_count, by = c("APREC" = "AREA NAME"))
+        base_plot <- base_plot +
+          geom_sf(data = bb, aes(fill = total_count), color = "black") +
+          scale_fill_gradient(low = "white", high = "red", na.value = "grey50") +
+          guides(fill = guide_colorbar(title = "Crime Count"))
+        
+      } else if (input$choice == "Show Crime Levels") {
+        Total_count <- Cd_filtered %>% 
+          group_by(`AREA NAME`) %>% 
+          summarise(total_count = n()) %>% .[order(-.$total_count), ] %>%
+          mutate(group = rep(c("High", "Moderate", "Low"), each = 7))
+        
+        lev_colors <- brewer.pal(3, "Set1")
+        names(lev_colors) <- unique(Total_count$group)
+        
+        bb <- left_join(boundary, Total_count, by = c("APREC" = "AREA NAME"))
+        
+        base_plot <- base_plot +
+          geom_sf(data = bb, aes(fill = group), color = "black") +
+          scale_fill_manual(name = "Group", values = lev_colors)
+          
       }
-      
-      bb <- left_join(boundary, Total_count, by = c("APREC" = "AREA NAME"))
-      base_plot <- base_plot +
-        geom_sf(data = bb, aes(fill = total_count), color = "black") +
-        scale_fill_gradient(low = "white", high = "red", na.value = "grey50") +
-        guides(fill = guide_colorbar(title = "Crime Count"))
       print(base_plot)
       
     } else {
@@ -207,6 +250,9 @@ server <- function(input, output, session) {
           selected_percentage = (selected_count / selected_crimes) * 100,
           area_percentage = (selected_count / total_count) * 100
         )
+      
+      if (input$start_dur == 0) {area_data$area_percentage =0}
+      
       area_data_long <- area_data %>%
         select(`AREA NAME`, selected_percentage, area_percentage) %>%
         gather(key = "Metric", value = "Value", -`AREA NAME`)

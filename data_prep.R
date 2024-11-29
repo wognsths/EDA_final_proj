@@ -1,5 +1,5 @@
 ## This file is for data analysis & data loaders
-library(tidyverse);library(ggplot2);library(sf);library(lubridate);library(data.table)
+library(tidyverse);library(ggplot2);library(sf);library(lubridate);library(data.table);library(RColorBrewer)
 
 Crime_Data <- read_csv("Crime_Data_from_2020_to_Present.csv")
 Police_station <- read_csv("~/EDA_final_proj/Sheriff_and_Police_Stations.csv")
