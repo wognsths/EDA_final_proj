@@ -343,7 +343,20 @@ server <- function(input, output, session) {
   output$additionalPlot2 <- renderPlot({
     plot <- ggplot()
     if (input$additionalplots == "mosaic") {
+      weapon_usage_data <- filteredData.Page2() %>% .[, weapon_usage := as.factor(weapon_usage)]
       
+      plot <- ggplot(data = weapon_usage_data) +
+        geom_mosaic(aes(x = product(Severity, weapon_usage), 
+                        fill = Severity)) +
+        scale_fill_manual(values = c("turquoise3", "orange2")) +
+        labs(x = "Weapon Usage", 
+             y = "Severity", 
+             title = ifelse(
+               length(input$selected_areas) == length(AREA_NAME), 
+               "Weapon Usage vs Severity in All Areas", 
+               paste("Weapon Usage vs Severity in", paste(input$selected_areas, collapse = ", "))
+             )) +
+        theme_mosaic()
     }
     print(plot)
   })
@@ -351,6 +364,20 @@ server <- function(input, output, session) {
   output$additionalPlot3 <- renderPlot({
     plot <- ggplot()
     if (input$additionalplots == "mosaic") {
+      crime_status_data <- filteredData.Page2()[!is.na(crime_status)] %>% .[, crime_status := as.factor(crime_status)]
+      
+      plot <- ggplot(data = crime_status_data) +
+        geom_mosaic(aes(x = product(Severity, crime_status), 
+                        fill = Severity)) +
+        scale_fill_manual(values = c("turquoise3", "orange2")) +
+        labs(x = "Crime Status", 
+             y = "Severity", 
+             title = ifelse(
+               length(input$selected_areas) == length(AREA_NAME), 
+               "Crime Status vs Severity in All Areas", 
+               paste("Crime Status vs Severity in", paste(input$selected_areas, collapse = ", "))
+             )) +
+        theme_mosaic()
       
     }
     print(plot)
