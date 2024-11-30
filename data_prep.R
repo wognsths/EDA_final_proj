@@ -24,13 +24,12 @@ CD <- Crime_Data %>%
       `Crm Cd` %in% c(121,122,815,820,821) ~ "RAPE",
       `Crm Cd` %in% c(210,220) ~ "ROBBERY",
       `Crm Cd` %in% c(230,231,235,236,250,251,761,926) ~ "AGG.ASSAULTS",
-      `Crm Cd` %in% c(435,436,437,622,624,625,626,627,647,763,928,930) ~ "SIM.ASSAULTS",
       `Crm Cd` %in% c(310,320) ~ "BURGLARY",
-      `Crm Cd` %in% c(510,520,433) ~ "VEICHLE.THEFT",
+      `Crm Cd` %in% c(510,520,433,522) ~ "VEICHLE.THEFT",
       `Crm Cd` %in% c(330,331,410,420,421) ~ "BURG.THEFT.FROMVEICHLE",
       `Crm Cd` %in% c(350,351,352,353,450,451,452,453) ~ "PERSONAL.THEFT",
-      `Crm Cd` %in% c(341,343,345,440,441,442,443,444,445,470,471,472,473,474,475,480,485,487,491) ~ "OTHER.THEFT",
-      TRUE ~ "Part2Crime"
+      `Crm Cd` %in% c(341,343,345,440,441,442,443,444,445,470,471,472,473,474,475,480,485,487,491,648) ~ "OTHER.THEFT",
+      TRUE ~ "PART2 Crime"
     ),
     hour = floor(as.numeric(`TIME OCC`) / 100),
     `AREA NAME` = toupper(`AREA NAME`),
