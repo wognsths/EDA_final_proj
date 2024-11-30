@@ -3,7 +3,8 @@ library(tidyverse);library(ggplot2);library(sf);library(lubridate)
 library(data.table);library(RColorBrewer);library(ggmosaic)
 
 Crime_Data <- read_csv("Crime_Data_from_2020_to_Present.csv")
-Police_station <- read_csv("~/EDA_final_proj/Sheriff_and_Police_Stations.csv")
+zipcodes_final <- read_csv("zipcodes_final.csv") # to be added differently
+Police_station <- read_csv("Sheriff_and_Police_Stations.csv")
 boundary <- st_read("LAPD_Div/LAPD_Divisions.shp")
 boundary <- st_transform(boundary, crs = 4326)
 
