@@ -120,7 +120,8 @@ ui <- navbarPage(
           label = "Select Plots",
           choices = list(
             "Mosaic Plot" = "mosaic",
-            "Piechart" = "pie"
+            "Piechart" = "pie",
+            "Density Plot (Duration of Reported)" = "density"
           )
         ),
         conditionalPanel(
@@ -149,7 +150,98 @@ ui <- navbarPage(
         conditionalPanel(
           condition = "input.additionalplots == 'pie'",
           # Pie Chart에 넣을거 생각해봅시당
-        )
+        ),
+        conditionalPanel(
+          condition = "input.additionalplots == 'density'",
+          selectInput(
+            inputId = "selected_areas",
+            label = "Select Area(s):",
+            choices = AREA_NAME,
+            selected = AREA_NAME,
+            multiple = TRUE
+          ),
+          numericInput(
+            inputId = "start_point",
+            label = "Start Point (Minimum Value of Duration Reported (Unit: days)):",
+            value = 7,
+            min = 0,
+            step = 7
+          ),
+          numericInput(
+            inputId = "end_point",
+            label = "End Point (Maximum Value of Duration Reported (Unit: days)):",
+            value = 21,
+            min = 0,
+            step = 7
+          ),
+          checkboxInput(
+            inputId = "log_scale",
+            label = "Scale by Log (10)",
+            value = FALSE
+          ),
+          selectInput(
+            inputId = "selected_category",
+            label = "Select Categories",
+            choices = list(
+              "Victim Sex" = "sex",
+              "Victim Descent" = "descent",
+              "Victim Age Group" = "age",
+              "Area" = "area"
+            )
+          ),
+          conditionalPanel(
+            condition = "input.selected_category == 'sex'",
+            selectInput(
+              inputId = "subset_sex",
+              label = "Select Categories",
+              choices = list(
+                "Male" = "M",
+                "Female" = "F"
+              ),
+              selected = list(
+                "Male" = "M",
+                "Female" = "F"
+              ),
+              multiple = TRUE
+            )
+          ),
+          conditionalPanel(
+            condition = "input.selected_category == 'descent'",
+            selectInput(
+              inputId = "subset_descent",
+              label = "Select Categories",
+              choices = Mosaic.CD$vict_descent %>% unique() %>% .[-1],
+              selected = Mosaic.CD$vict_descent %>% unique() %>% .[-1],
+              multiple = TRUE
+            )
+          ),
+          conditionalPanel(
+            condition = "input.selected_category == 'age'",
+            selectInput(
+              inputId = "subset_age",
+              label = "Select Categories",
+              choices = c("Youth (0~14)",
+                          "Adult (15~64)",
+                          "Elderly (65~)"),
+              selected = c("Youth (0~14)",
+                           "Adult (15~64)",
+                           "Elderly (65~)"),
+              multiple = TRUE
+            )
+          ),
+          conditionalPanel(
+            condition = "input.selected_category == 'area'"
+          ),
+          selectInput(
+            inputId = "select_metric",
+            label = "Select Metric",
+            choices = list(
+              "Density Plot" = "density",
+              "Ecdf" = "ecdf",
+              "Histogram (Position: fill)" = "hist_fill"
+            )
+          )
+        ),
       ),
       mainPanel(
         plotOutput("additionalPlot")
@@ -408,6 +500,65 @@ server <- function(input, output, session) {
       
     } else if (input$additionalplots == "pie") {
       # Pie Chart
+    } else if (input$additionalplots == "density") {
+      data <- filteredData.Page2()
+      
+      data <- data[`Dur Rptd` >= input$start_point]
+      data <- data[`Dur Rptd` <= input$end_point]
+      
+      if (input$log_scale) {
+        data <- data %>%
+          mutate(`Dur Rptd` = `Dur Rptd` + 1) %>%
+          mutate(`Dur Rptd` = log10(`Dur Rptd`))
+          }
+      
+      if (input$selected_category == "sex") {
+        data <- data[vict_sex %in% input$subset_sex]
+      } else if (input$selected_category == "descent") {
+        data <- data[vict_descent %in% input$subset_descent]
+      } else if (input$selected_category == "age") {
+        data <- data[vict_age %in% input$subset_age] 
+      } else if (input$selected_category == "area") {
+        ### No need subset
+      }
+      
+      category_var <- switch(input$selected_category,
+                             'sex' = 'vict_sex',
+                             'descent' = 'vict_descent',
+                             'age' = 'vict_age',
+                             'area' = 'AREA NAME')
+      if (!category_var %in% names(data)) {
+        stop("Invalid category variable selected.")
+      }
+      
+      data[, category := factor(get(category_var))]
+      
+      if (input$select_metric == 'density') {
+        plot <- ggplot(data, aes(x = `Dur Rptd`, color = category)) +
+          geom_density() +
+          labs(x = 'Duration between Occurrence and Report Date',
+               y = 'Density',
+               color = input$selected_category,
+               title = 'Density Plot of Reporting Delay by Category') +
+          theme_minimal()
+      } else if (input$select_metric == 'ecdf') {
+        plot <- ggplot(data, aes(x = `Dur Rptd`, color = category)) +
+          stat_ecdf() +
+          labs(x = 'Duration between Occurrence and Report Date',
+               y = 'ECDF',
+               color = input$selected_category,
+               title = 'ECDF of Reporting Delay by Category') +
+          theme_minimal()
+      } else if (input$select_metric == "hist_fill") {
+        plot <- ggplot(data, aes(x = `Dur Rptd`, fill = category)) +
+          geom_histogram(position = "fill") +
+          labs(x = 'Duration between Occurrence and Report Date',
+               y = 'Ratio',
+               color = input$selected_category,
+               title = 'Ratio of Reporting Delay by Category') +
+          theme_minimal()
+      }
+      print(plot)
     }
   })
   
