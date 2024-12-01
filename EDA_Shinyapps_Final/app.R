@@ -5,6 +5,7 @@ Geo.CD <- GeoData_Loader()
 Mosaic.CD <- MosaicData_Loader()
 crime_groups_choices <- Geo.CD$Crm.Cd.Group %>% unique() %>% sort()
 AREA_NAME <- Mosaic.CD$`AREA NAME` %>% unique()
+DEC <- Geo.CD$`vict_descent` %>% unique() %>% .[-1]
 
 ui <- navbarPage(
   "Analysis of Crime Data in 2023, LA",
@@ -25,6 +26,13 @@ ui <- navbarPage(
           label = "Weapon Used:",
           choices = c("Yes", "No"),
           selected = c("Yes", "No"),
+          multiple = TRUE
+        ),
+        selectInput(
+          inputId = "select_descent",
+          label = "Select Descent:",
+          choices = DEC,
+          selected = DEC,
           multiple = TRUE
         ),
         selectInput(
@@ -100,10 +108,13 @@ ui <- navbarPage(
               value = FALSE
             )
           )
-        )
+        ),
+        br(),
+        actionButton("capture", "Capture"),
+        actionButton("reset", "Reset")
       ),
       mainPanel(
-        plotOutput("crimePlot", width = "100%", height = "600px"),
+        uiOutput("crimePlots", width = "100%", height = "600px"),
         htmlOutput("crimeStats"),
         plotOutput("optionPlot")
       )
@@ -120,7 +131,7 @@ ui <- navbarPage(
           label = "Select Plots",
           choices = list(
             "Mosaic Plot" = "mosaic",
-            "Piechart" = "pie",
+            "rptd dur vs distance by crime" = "crime",
             "Density Plot (Duration of Reported)" = "density"
           )
         ),
@@ -148,8 +159,25 @@ ui <- navbarPage(
           )
         ),
         conditionalPanel(
-          condition = "input.additionalplots == 'pie'",
-          # Pie Chart에 넣을거 생각해봅시당
+          condition = "input.additionalplots == 'crime'",
+          selectInput(
+            inputId = "select_crime",
+            label = "Select Crime Type",
+            choices = crime_groups_choices,
+            selected = crime_groups_choices[1],
+            multiple = FALSE
+          )
+        ),
+        conditionalPanel(
+          condition = "input.additionalplots == 'density'",
+          selectInput(
+            inputId = "dist_metric",
+            label = "Select Distance Metric",
+            choices = list("L1 distance" = "L1_dist",
+                           "L2 distance" = "L2_dist"),
+            selected = "L1 distance",
+            multiple = FALSE
+          )
         ),
         conditionalPanel(
           condition = "input.additionalplots == 'density'",
@@ -259,6 +287,9 @@ ui <- navbarPage(
 
 server <- function(input, output, session) {
   ## PAGE 1
+  
+  capturedPlot <- reactiveVal(NULL)
+  
   observe({
     if (input$use_end && input$end_dur < input$start_dur) {
       updateNumericInput(session, "end_dur", value = input$start_dur)
@@ -285,19 +316,17 @@ server <- function(input, output, session) {
       filter(`Dur Rptd` >= start_value & `Dur Rptd` <= end_value,
              Crm.Cd.Group %in% input$crime_types,
              `weapon_usage` %in% input$weapon_usage,
-             Severity %in% input$severity)
+             Severity %in% input$severity,
+             vict_descent %in% input$select_descent)
   })
   
-  output$crimePlot <- renderPlot({
+  currentPlot <- reactive({
     Cd_filtered <- filteredData()
-    
-    Title <- ifelse(input$heatmap, "Heatmap", "Scatterplot")
     
     base_plot <- ggplot() +
       labs(
         title = paste0(
-          Title,
-          " of Crime Locations for Duration Reported ",
+          "Crime Locations for Duration Reported ",
           input$start_dur,
           if (input$use_end) paste0(" to ", input$end_dur, " Days") else " Days and Above"
         ),
@@ -331,16 +360,51 @@ server <- function(input, output, session) {
         base_plot <- base_plot +
           geom_sf(data = bb, aes(fill = group), color = "black") +
           scale_fill_manual(name = "Group", values = lev_colors)
-          
       }
-      print(base_plot)
-      
     } else {
       base_plot <- base_plot +
         geom_sf(data = boundary, fill = NA, color = "black") +
         geom_point(data = Cd_filtered, aes(x = LON, y = LAT), alpha = 0.5, size = 0.5)
-      print(base_plot)
     }
+    
+    base_plot
+  })
+  
+  output$crimePlot <- renderPlot({
+    print(currentPlot())
+  })
+  
+  observeEvent(input$capture, {
+    capturedPlot(currentPlot())
+    showNotification("Current plot has been captured", type = "message")
+  })
+  
+  output$crimePlots <- renderUI({
+    if (!is.null(capturedPlot())) {
+      tagList(
+        column(6, 
+               tags$h4(style = "text-align: center; font-weight: bold;", "Previous Plot"),
+               plotOutput("capturedCrimePlot", height = "600px", width = "100%")),
+        column(6,
+               tags$h4(style = "text-align: center; font-weight: bold;", "Current Plot"),
+               plotOutput("crimePlot", height = "600px", width = "100%"))
+      )
+    } else {
+      tagList(
+        tags$h4(style = "text-align: center; font-weight: bold;", "Current Plot"),
+        plotOutput("crimePlot", height = "600px", width = "100%")
+              )
+    }
+  })
+  
+  output$capturedCrimePlot <- renderPlot({
+    req(capturedPlot())
+    print(capturedPlot())
+  })
+  
+  observeEvent(input$reset, {
+    capturedPlot(NULL)
+    showNotification("Captured plot has been deleted", type = "warning")
   })
   
   output$crimeStats <- renderUI({
@@ -498,8 +562,18 @@ server <- function(input, output, session) {
         print(plot)
       }
       
-    } else if (input$additionalplots == "pie") {
-      # Pie Chart
+    } else if (input$additionalplots == "crime") {
+      data <- filteredData() %>%
+        select(., c(Crm.Cd.Group, `Dur Rptd`, input$dist_metric)) %>%
+        filter(., Crm.Cd.Group == input$select_crime)
+      
+      plot <- ggplot(data, aes(x = .data[[input$dist_metric]], y = `Dur Rptd`)) +
+        geom_point(alpha = 0.6, size = 0.7)
+      
+      if (!is.null(plot)) {
+        print(plot)
+      }
+      
     } else if (input$additionalplots == "density") {
       data <- filteredData.Page2()
       
@@ -510,7 +584,7 @@ server <- function(input, output, session) {
         data <- data %>%
           mutate(`Dur Rptd` = `Dur Rptd` + 1) %>%
           mutate(`Dur Rptd` = log10(`Dur Rptd`))
-          }
+      }
       
       if (input$selected_category == "sex") {
         data <- data[vict_sex %in% input$subset_sex]
