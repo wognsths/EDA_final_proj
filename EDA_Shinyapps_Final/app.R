@@ -74,6 +74,17 @@ ui <- navbarPage(
           label = "Crime Percentages by Area",
           value = TRUE
         ),
+        conditionalPanel(
+          condition = "input.crime_percentage_plot_show == true",
+          div(
+            style = "margin-left: 20px;",
+            checkboxInput(
+              inputId = "refuse_area",
+              label = "I don't want to see percentage within area",
+              value = FALSE
+            )
+          )
+        ),
         checkboxInput(
           inputId = "crime_dist_plot_show",
           label = "Distance Between Crime Location and Nearest Police Station",
@@ -93,7 +104,7 @@ ui <- navbarPage(
       ),
       mainPanel(
         plotOutput("crimePlot", width = "100%", height = "600px"),
-        textOutput("crimeStats"),
+        htmlOutput("crimeStats"),
         plotOutput("optionPlot")
       )
     )
@@ -114,20 +125,34 @@ ui <- navbarPage(
         ),
         conditionalPanel(
           condition = "input.additionalplots == 'mosaic'",
-          checkboxGroupInput(
-            inputId = "selected_areas", 
-            label = "Select Area(s):", 
+          selectInput(
+            inputId = "selected_areas",
+            label = "Select Area(s):",
             choices = AREA_NAME,
-            selected = AREA_NAME
+            selected = AREA_NAME,
+            multiple = TRUE
           ),
-          actionButton("select_all", "Select All Areas"),
-          actionButton("clear_selection", "Clear Selection")
+          selectInput(
+            inputId = "selected_plot",
+            label = "Select Plot:",
+            choices = list(
+              "Victim Sex vs Severity" = "plot1",
+              "Weapon Usage vs Severity" = "plot2",
+              "Crime Status vs Severity" = "plot3",
+              "Victim Age Group vs Severity" = "plot4",
+              "Victim Descent vs Severity" = "plot5",
+              "Duration of Reported vs Severity" = "plot6"
+            ),
+            selected = "plot1"
+          )
+        ),
+        conditionalPanel(
+          condition = "input.additionalplots == 'pie'",
+          # Pie Chart에 넣을거 생각해봅시당
         )
       ),
       mainPanel(
-        plotOutput("additionalPlot1"),
-        plotOutput("additionalPlot2"),
-        plotOutput("additionalPlot3")
+        plotOutput("additionalPlot")
       )
     )
   ),
@@ -226,17 +251,17 @@ server <- function(input, output, session) {
     }
   })
   
-  output$crimeStats <- renderText({
+  output$crimeStats <- renderUI({
     Cd_filtered <- filteredData()
     
     total_crimes <- nrow(CD)
     selected_crimes <- nrow(Cd_filtered)
     percentage <- round((selected_crimes / total_crimes) * 100, 2)
     
-    paste0(
-      "Crime Count in Selected Interval: ", selected_crimes, "\n\n",
+    HTML(paste0(
+      "Crime Count in Selected Interval: ", selected_crimes, "<br>",
       "Percentage of Total Crimes: ", percentage, "%"
-    )
+    ))
   })
   
   output$optionPlot <- renderPlot({
@@ -265,7 +290,7 @@ server <- function(input, output, session) {
           area_percentage = (selected_count / total_count) * 100
         )
       
-      if (input$start_dur == 0) {area_data$area_percentage =0}
+      if (input$refuse_area == TRUE) {area_data$area_percentage =0}
       
       area_data_long <- area_data %>%
         select(`AREA NAME`, selected_percentage, area_percentage) %>%
@@ -303,85 +328,91 @@ server <- function(input, output, session) {
   
   ## PAGE 2 ##
   
-  observeEvent(input$select_all, {
-    updateCheckboxGroupInput(session, "selected_areas", 
-                             selected = AREA_NAME)
-  })
-  
-  observeEvent(input$clear_selection, {
-    updateCheckboxGroupInput(session, "selected_areas", 
-                             selected = character(0))
-  })
   filteredData.Page2 <- reactive({
-    if (length(input$selected_areas) == 0) {
-      return(Mosaic.CD)
-    } else {
-      return(Mosaic.CD %>% data.table %>% .[`AREA NAME` %in% input$selected_areas])
+    data <- Mosaic.CD %>% data.table
+    if (length(input$selected_areas) > 0) {
+      data <- data[`AREA NAME` %in% input$selected_areas]
+    }
+    return(data)
+  })
+  output$additionalPlot <- renderPlot({
+    if (input$additionalplots == "mosaic") {
+      data <- filteredData.Page2()
+      plot <- NULL
+      
+      if (input$selected_plot == "plot1") {
+        vict_sex_data <- data[!is.na(vict_sex)]
+        vict_sex_data[, vict_sex := as.factor(vict_sex)]
+        
+        plot <- ggplot(data = vict_sex_data) +
+          geom_mosaic(aes(x = product(Severity, vict_sex), fill = Severity)) +
+          scale_fill_manual(values = c("turquoise3", "orange2")) +
+          labs(x = "Victim Sex", y = "Severity", title = "Victim Sex vs Severity") +
+          theme_mosaic()
+        
+      } else if (input$selected_plot == "plot2") {
+        weapon_usage_data <- data
+        weapon_usage_data[, weapon_usage := as.factor(weapon_usage)]
+        
+        plot <- ggplot(data = weapon_usage_data) +
+          geom_mosaic(aes(x = product(Severity, weapon_usage), fill = Severity)) +
+          scale_fill_manual(values = c("turquoise3", "orange2")) +
+          labs(x = "Weapon Usage", y = "Severity", title = "Weapon Usage vs Severity") +
+          theme_mosaic()
+        
+      } else if (input$selected_plot == "plot3") {
+        crime_status_data <- data[!is.na(crime_status)]
+        crime_status_data[, crime_status := as.factor(crime_status)]
+        
+        plot <- ggplot(data = crime_status_data) +
+          geom_mosaic(aes(x = product(Severity, crime_status), fill = Severity)) +
+          scale_fill_manual(values = c("turquoise3", "orange2")) +
+          labs(x = "Crime Status", y = "Severity", title = "Crime Status vs Severity") +
+          theme_mosaic()
+        
+      } else if (input$selected_plot == "plot4") {
+        vict_age_data <- data[!is.na(vict_age)]
+        vict_age_data[, vict_age := factor(vict_age, levels = c("Youth (0~14)", "Adult (15~64)", "Elderly (65~)"))]
+        
+        plot <- ggplot(data = vict_age_data) +
+          geom_mosaic(aes(x = product(Severity, vict_age), fill = Severity)) +
+          scale_fill_manual(values = c("turquoise3", "orange2")) +
+          labs(x = "Victim Age Group", y = "Severity", title = "Victim Age Group vs Crime Severity") +
+          theme_mosaic()
+        
+      } else if (input$selected_plot == "plot5") {
+        vict_descent_data <- data[!is.na(vict_descent)]
+        vict_descent_data[, vict_descent := as.factor(vict_descent)]
+        
+        plot <- ggplot(data = vict_descent_data) +
+          geom_mosaic(aes(x = product(Severity, vict_descent), fill = Severity)) +
+          scale_fill_manual(values = c("turquoise3", "orange2")) +
+          labs(x = "Victim Descent", y = "Severity", title = "Victim Descent vs Crime Severity") +
+          theme_mosaic() +
+          theme(axis.text.x = element_text(angle = 45, hjust = 1))
+      } else if (input$selected_plot == "plot6") {
+        cat_dur_rptd_data <- data[!is.na(cat_dur_rptd)]
+        cat_dur_rptd_data[, cat_dur_rptd := as.factor(cat_dur_rptd)]
+        
+        plot <- ggplot(data = cat_dur_rptd_data) +
+          geom_mosaic(aes(x = product(Severity, cat_dur_rptd), fill = Severity)) +
+          scale_fill_manual(values = c("turquoise3", "orange2")) +
+          labs(x = "Duration of Reported", y = "Severity", title = "Duration of Reported vs Crime Severity") +
+          theme_mosaic() +
+          theme(axis.text.x = element_text(angle = 45, hjust = 1))
+      }
+      
+      if (!is.null(plot)) {
+        print(plot)
+      }
+      
+    } else if (input$additionalplots == "pie") {
+      # Pie Chart
     }
   })
   
-  output$additionalPlot1 <- renderPlot({
-    if (input$additionalplots == "mosaic") {
-      vict_sex_data <- filteredData.Page2()[!is.na(vict_sex)] %>% .[, vict_sex := as.factor(vict_sex)]
-      
-      plot <- ggplot(data = vict_sex_data) +
-        geom_mosaic(aes(x = product(Severity, vict_sex), 
-                        fill = Severity)) +
-        scale_fill_manual(values = c("turquoise3", "orange2")) +
-        labs(x = "Victim Sex", 
-             y = "Severity", 
-             title = ifelse(
-               length(input$selected_areas) == length(AREA_NAME), 
-               "Victim Sex vs Severity in All Areas", 
-               paste("Victim Sex vs Severity in", paste(input$selected_areas, collapse = ", "))
-             )) +
-        theme_mosaic()
-    }
-    print(plot)
-  })
   
-  output$additionalPlot2 <- renderPlot({
-    plot <- ggplot()
-    if (input$additionalplots == "mosaic") {
-      weapon_usage_data <- filteredData.Page2() %>% .[, weapon_usage := as.factor(weapon_usage)]
-      
-      plot <- ggplot(data = weapon_usage_data) +
-        geom_mosaic(aes(x = product(Severity, weapon_usage), 
-                        fill = Severity)) +
-        scale_fill_manual(values = c("turquoise3", "orange2")) +
-        labs(x = "Weapon Usage", 
-             y = "Severity", 
-             title = ifelse(
-               length(input$selected_areas) == length(AREA_NAME), 
-               "Weapon Usage vs Severity in All Areas", 
-               paste("Weapon Usage vs Severity in", paste(input$selected_areas, collapse = ", "))
-             )) +
-        theme_mosaic()
-    }
-    print(plot)
-  })
   
-  output$additionalPlot3 <- renderPlot({
-    plot <- ggplot()
-    if (input$additionalplots == "mosaic") {
-      crime_status_data <- filteredData.Page2()[!is.na(crime_status)] %>% .[, crime_status := as.factor(crime_status)]
-      
-      plot <- ggplot(data = crime_status_data) +
-        geom_mosaic(aes(x = product(Severity, crime_status), 
-                        fill = Severity)) +
-        scale_fill_manual(values = c("turquoise3", "orange2")) +
-        labs(x = "Crime Status", 
-             y = "Severity", 
-             title = ifelse(
-               length(input$selected_areas) == length(AREA_NAME), 
-               "Crime Status vs Severity in All Areas", 
-               paste("Crime Status vs Severity in", paste(input$selected_areas, collapse = ", "))
-             )) +
-        theme_mosaic()
-      
-    }
-    print(plot)
-  })
 }
 
 # Run the application 

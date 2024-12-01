@@ -36,7 +36,30 @@ CD <- Crime_Data %>%
     `AREA NAME` = case_when(
       `AREA NAME` == "N HOLLYWOOD" ~ "NORTH HOLLYWOOD",
       `AREA NAME` == "WEST LA" ~ "WEST LOS ANGELES",
-      TRUE ~ `AREA NAME`
+      TRUE ~ `AREA NAME`,
+    ),
+    vict_age = case_when(
+      `Vict Age` == -1 ~ NA,
+      (`Vict Age` == 0) & (is.na(vict_sex)) ~ NA, 
+      `Vict Age` < 15 ~ "Youth (0~14)",
+      `Vict Age` > 64 ~ "Elderly (65~)", 
+      TRUE ~ "Adult (15~64)"
+    ),
+    vict_descent = case_when(
+      `Vict Descent` %in% c("A", "C", "D", "F", "J", "K", "L", "V", "Z") ~ "Asian",
+      `Vict Descent` == "B" ~ "Black",
+      `Vict Descent` == "H" ~ "Hispanic",
+      `Vict Descent` == "W" ~ "White",
+      `Vict Descent` %in% c("G", "P", "S", "U") ~ "Pacific Islander",
+      `Vict Descent` == "I" ~ "Native American",
+      `Vict Descent` == "O" ~ "Other",
+      TRUE ~ NA 
+    ),
+    cat_dur_rptd = case_when(
+      `Dur Rptd` == 0 ~ "Same-day report",
+      `Dur Rptd` > 0 & `Dur Rptd` <= 100 ~ "Reported within 100 days",
+      `Dur Rptd` > 100 ~ "Reported after 100 days",
+      TRUE ~ NA
     )
   ) %>% filter(OCC_year == 2023, LAT != 0, LON != 0, `Dur Rptd` >= 0) %>%
   select(., -c('DR_NO', `Date Rptd`, `DATE OCC`, `TIME OCC`,
@@ -60,7 +83,9 @@ GeoData_Loader <- function() {
 
 MosaicData_Loader <- function() {
   CD %>% 
-    select(., c(Severity, weapon_usage, crime_status, vict_sex, `AREA NAME`, `Dur Rptd`)) -> Mosaic.CD
+    select(., c(Severity, weapon_usage, crime_status, 
+                vict_sex, `AREA NAME`, `Dur Rptd`,
+                vict_descent, vict_age, cat_dur_rptd)) -> Mosaic.CD
   return(Mosaic.CD)
 }
 
@@ -70,14 +95,11 @@ Distance_Calculator <- function(Criteria_point, Data, option = 2) {
   Data <- as.matrix(Data)
   Criteria_point <- as.matrix(Criteria_point)
   
-  # Scaling factors
-  
   Point_for_real_dist <- Data %>% apply(., 2, range) %>% apply(.,2,mean)
   
   lat_scale <- 111.32  # km per degree latitude
   lon_scale <- 111.32 * cos(Point_for_real_dist[2] * pi / 180)  # km per degree longitude
   
-  # Apply scaling to Data and Criteria_point
   Data_scaled <- Data
   Data_scaled[, 1] <- Data[, 1] * lat_scale     # Scale latitude
   Data_scaled[, 2] <- Data[, 2] * lon_scale     # Scale longitude
@@ -98,7 +120,7 @@ Distance_Calculator <- function(Criteria_point, Data, option = 2) {
     Distance_sq <- outer(Data_norms, rep(1, m)) + 
       outer(rep(1, n), Criteria_norms) - 2 * Cross_prod
     
-    Distance_sq[Distance_sq < 0] <- 0  # Correct for numerical errors
+    Distance_sq[Distance_sq < 0] <- 0
     
     Distance <- sqrt(Distance_sq)
     return(Distance)
