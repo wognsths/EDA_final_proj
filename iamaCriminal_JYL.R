@@ -3,6 +3,14 @@ library(tidyverse); library(stringr);library(sf); library(tidycensus); library(h
 crime_2023 <- read.csv("crime_2023.csv")
 crime_2023$AREA.NAME <- toupper(crime_2023$AREA.NAME)
 
+source("data_prep.R")
+
+Geo.CD <- GeoData_Loader()
+Mosaic.CD <- MosaicData_Loader()
+crime_groups_choices <- Geo.CD$Crm.Cd.Group %>% unique() %>% sort()
+AREA_NAME <- Mosaic.CD$`AREA NAME` %>% unique()
+zipcodes_final
+
 
 crime_2023_CD <- crime_2023 %>% mutate(
   Crm.Cd.Group = case_when(
@@ -176,11 +184,14 @@ zipcodes_data_final <- zipcodes_data_final %>%
   rename("AREA NAME" = AREA.NAME)
 
 write.csv(zipcodes_data_final,"zipcodes_final.csv", row.names = FALSE)
+zipcodes_data_final %>% colnames()
+crime_2023_CD %>% colnames()
 
+zipcodes_data_final
 
 #View(zipcodes_data)
-crime_2023_CD %>% colnames()
-crime_2023_CD_FINAL <- crime_2023_CD %>% left_join(zipcodes_data, by = AREA.NAME)
+#crime_2023_CD %>% colnames()
+#crime_2023_CD_FINAL <- crime_2023_CD %>% left_join(zipcodes_data, by = AREA.NAME)
 
 
 
@@ -250,24 +261,73 @@ crime_2023_CD %>% colnames
 
 crime_2023_CD %>% head()
 
-grouped_data <- crime_2023_CD %>%
-  group_by(AREA.NAME, Crm.Cd.Group) %>% 
+
+grouped_data <- CD %>%
+  group_by(CD['AREA NAME'], Crm.Cd.Group) %>% 
   count() %>% ungroup()
 
-grouped_data
 
 proportional_data <- grouped_data %>%
-  group_by(AREA.NAME) %>%
+  group_by(grouped_data['AREA NAME']) %>%
   mutate(proportion = n / sum(n)) %>%
   ungroup()
 
-proportional_data
+highlight_prop <- (proportional_data %>% filter(Crm.Cd.Group == "PERSONAL.THEFT") %>% 
+  arrange(desc(proportion)) %>% head(5))$'AREA NAME'
+
+boundary$highlight <- ifelse(boundary$APREC %in% highlight, "PERSONAL.THEFT", "Others")
+
+ggplot(boundary) +
+  geom_sf(aes(fill = highlight)) +
+  scale_fill_manual(values = c("PERSONAL.THEFT" = "green", "Others" = "grey")) +
+  theme_minimal()
+
+# non proportional로 바라볼때?!
+highlight_count <- (grouped_data %>% filter(Crm.Cd.Group == "PERSONAL.THEFT") %>% 
+                arrange(desc(n)) %>% head(5))$'AREA NAME'
+
+boundary$highlight <- ifelse(boundary$APREC %in% count_highlight, "PERSONAL.THEFT", "Others")
+
+ggplot(boundary) +
+  geom_sf(aes(fill = highlight)) +
+  scale_fill_manual(values = c("PERSONAL.THEFT" = "green", "Others" = "grey")) +
+  theme_minimal()
 
 
-proportional_data %>% select(Crm.Cd.Group) %>% unique()
+# 합쳐서 시각화해주기!
+grouped_data <- CD %>%
+  group_by(CD['AREA NAME'], Crm.Cd.Group) %>% 
+  count() %>% ungroup()
 
-highlight <- (proportional_data %>% filter(Crm.Cd.Group == "HOMICIDE") %>% 
-  arrange(desc(proportion)) %>% head(5))$AREA.NAME
+
+proportional_data <- grouped_data %>%
+  group_by(grouped_data['AREA NAME']) %>%
+  mutate(proportion = n / sum(n)) %>%
+  ungroup()
+
+highlight_prob <- (proportional_data %>% filter(Crm.Cd.Group == "PERSONAL.THEFT") %>% 
+                     arrange(desc(proportion)) %>% head(5))$'AREA NAME'
+
+highlight_count <- (grouped_data %>% filter(Crm.Cd.Group == "PERSONAL.THEFT") %>% 
+                      arrange(desc(n)) %>% head(5))$'AREA NAME'
+
+# Define the conditions for coloring
+boundary$highlight_cat <- ifelse(boundary$APREC %in% highlight_prob & boundary$APREC %in% highlight_count, "BOTH",
+                         ifelse(boundary$APREC %in% highlight_count, "COUNT",
+                                ifelse(boundary$APREC %in% highlight_prob, "PROB", "OTHERS")))
+
+ggplot(boundary) +
+  geom_sf(aes(fill = highlight_cat)) +
+  scale_fill_manual(values = c("BOTH" = "red","COUNT" = "green","PROB" ="blue", "OTHERS" = "grey")) +
+  theme_minimal()
+
+
+# Check the first few rows to confirm the results
+head(boundary)
+
+# Personal theft 및에 들어가 있는 범죄의 종류를 나중에 같이 띄워주면 이해에 더 쉬울 것 같음.
+
+
 
 crime_2023_CD %>% filter(Crm.Cd.Group == "PERSONAL.THEFT") %>% select(Crm.Cd.Desc) %>% unique()
 # Personal theft 및에 들어가 있는 범죄의 종류를 나중에 같이 띄워주면 이해에 더 쉬울 것 같음.
@@ -278,6 +338,92 @@ ggplot(boundary) +
   geom_sf(aes(fill = highlight)) +
   scale_fill_manual(values = c("PERSONAL.THEFT" = "green", "Others" = "grey")) +
   theme_minimal()
+
+# 인구대비 범죄율 
+CD %>% colnames
+area_crime$CrimePerPopulation
+View(area_crime)
+zipcodes_final$'AREA NAME'
+
+area_crime <- CD %>% group_by(CD['AREA NAME']) %>% count() %>% 
+  left_join(zipcodes_final, by = 'AREA NAME') %>% mutate(CrimePerPopulation = n/Total_population)
+
+boundary <- boundary %>% left_join(area_crime %>% select(c('AREA NAME', CrimePerPopulation)), by = c("APREC" = "AREA NAME"))
+
+ggplot(boundary) +
+  geom_sf(aes(fill = CrimePerPopulation)) +
+  scale_fill_gradient(low = "white", high = "red") +
+  guides(fill = guide_colorbar(title = "Crime Per Population"))
+
+
+area_crime %>% select(c('AREA NAME', CrimePerPopulation))
+
+area_crime %>% colnames()
+
+ggplot(area_crime, aes(y=CrimePerPopulation,x=median_household_income)) +
+  geom_point() +
+  geom_smooth(method="loess", span = 1, se = FALSE)
+
+area_crime <- area_crime %>% mutate(unemployment = Total_unemployed / (Total_employed + Total_unemployed)) 
+area_crime %>% select(unemployment)
+
+# area_crime %>% filter(`AREA NAME` != "CENTRAL")
+# 
+# 
+# ggplot(area_crime %>% filter(`AREA NAME` != "CENTRAL"), aes(y=CrimePerPopulation,x=unemployment)) +
+#   geom_point() +
+#   geom_smooth(method="loess")
+
+ggplot(area_crime, aes(y=CrimePerPopulation,x=unemployment)) +
+  geom_point() +
+  geom_smooth(method="loess", span = 1, se = FALSE)
+
+area_crime %>% colnames
+#area_crime %>% select(c(poverty_under_50, poverty_50_to_99,poverty_100_to_124,poverty_125_to_149,poverty_150_to_184,poverty_185_to_199,poverty_200_and_over)) %>% View()
+
+
+
+area_crime <- area_crime %>% mutate(gap=(poverty_under_50+ poverty_50_to_99 + poverty_100_to_124) / poverty_200_and_over)
+area_crime
+ggplot(area_crime, aes(y=CrimePerPopulation,x=gap)) +
+  geom_point() +
+  geom_smooth(method="loess", span = 1, se = FALSE)
+
+CD %>% colnames()
+CD %>% select(hour)
+
+
+CD <- CD %>%
+  mutate(period = case_when(
+    hour >= 6 & hour < 12 ~ "morning",
+    hour >= 12 & hour < 18 ~ "afternoon",
+    hour >= 18 & hour < 24 ~ "night",
+    (hour >= 0 & hour < 6) | hour == 24 ~ "late_night"
+  ))
+
+library(RColorBrewer)
+
+time_period = c("late_night")
+total_count <- CD %>% group_by(Crm.Cd.Group) %>% count() %>% rename(total_n = n)
+time_comp <- CD %>% filter(period == time_period) %>% group_by(Crm.Cd.Group) %>% 
+  count() %>% left_join(total_count, by = "Crm.Cd.Group") %>% mutate(prop = n / total_n)
+
+ggplot(time_comp, aes(x = Crm.Cd.Group, y = prop, fill = Crm.Cd.Group)) +
+  geom_bar(stat = "identity") +
+  scale_fill_brewer(palette = "Set3") +
+  theme_void()
+
+select_crime = "AGG.ASSAULTS"
+crime_pie <- CD %>% filter(Crm.Cd.Group == select_crime) %>% group_by(period) %>% 
+  count() %>% ungroup() %>% mutate(prop = n/sum(n))
+
+ggplot(crime_pie, aes(x = "", y = prop, fill = period)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar("y", start = 0) +
+  scale_fill_brewer(palette = "Set3") +
+  theme_void()
+
+
 
 
 
