@@ -5,7 +5,8 @@ Geo.CD <- GeoData_Loader()
 Mosaic.CD <- MosaicData_Loader()
 crime_groups_choices <- Geo.CD$Crm.Cd.Group %>% unique() %>% sort()
 AREA_NAME <- Mosaic.CD$`AREA NAME` %>% unique()
-DEC <- Geo.CD$`vict_descent` %>% unique() %>% .[-1]
+DEC <- Geo.CD$`vict_descent` %>% unique()
+time_choices <- c("Morning", "Afternoon", "Night", "Late Night")
 
 ui <- navbarPage(
   "Analysis of Crime Data in 2023, LA",
@@ -131,8 +132,10 @@ ui <- navbarPage(
           label = "Select Plots",
           choices = list(
             "Mosaic Plot" = "mosaic",
-            "rptd dur vs distance by crime" = "crime",
-            "Density Plot (Duration of Reported)" = "density"
+            "Duration of Reported vs Distance Between Police Station" = "crime",
+            "Density Plot (Duration of Reported)" = "density",
+            "Crime Proportions by Time" = "crime_proportion",
+            "Crime and Socioeconomic Factors" = "crime_socioeco"
           )
         ),
         conditionalPanel(
@@ -191,7 +194,7 @@ ui <- navbarPage(
           numericInput(
             inputId = "start_point",
             label = "Start Point (Minimum Value of Duration Reported (Unit: days)):",
-            value = 7,
+            value = 0,
             min = 0,
             step = 7
           ),
@@ -270,6 +273,15 @@ ui <- navbarPage(
             )
           )
         ),
+        conditionalPanel(
+          condition = "input.additionalplots == 'crime_proportion'"
+        ),
+        selectInput(
+          inputId = "selected_periods",
+          label = "Select Time Period(s):",
+          choices = time_choices,
+          selected = time_choices
+        )
       ),
       mainPanel(
         plotOutput("additionalPlot")
@@ -319,6 +331,7 @@ server <- function(input, output, session) {
              Severity %in% input$severity,
              vict_descent %in% input$select_descent)
   })
+  print(filteredData %>% dim())
   
   currentPlot <- reactive({
     Cd_filtered <- filteredData()
@@ -633,6 +646,8 @@ server <- function(input, output, session) {
           theme_minimal()
       }
       print(plot)
+    } else if (input$additionalplots == "crime_proportion") {
+      print("ddd")
     }
   })
   

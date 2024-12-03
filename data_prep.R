@@ -53,7 +53,7 @@ CD <- Crime_Data %>%
       `Vict Descent` %in% c("G", "P", "S", "U") ~ "Pacific Islander",
       `Vict Descent` == "I" ~ "Native American",
       `Vict Descent` == "O" ~ "Other",
-      TRUE ~ NA 
+      TRUE ~ "Descent is not Specified"
     ),
     cat_dur_rptd = case_when(
       `Dur Rptd` == 0 ~ "Same-day report",
