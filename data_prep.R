@@ -1,6 +1,6 @@
 ## This file is for data analysis & data loaders
 library(tidyverse);library(ggplot2);library(sf);library(lubridate)
-library(data.table);library(RColorBrewer);library(ggmosaic)
+library(data.table);library(RColorBrewer);library(ggmosaic);library(gridExtra)
 
 Crime_Data <- read_csv("Crime_Data_from_2020_to_Present.csv")
 zipcodes_final <- read_csv("zipcodes_final.csv") # to be added differently
@@ -32,6 +32,12 @@ CD <- Crime_Data %>%
       TRUE ~ "PART2 Crime"
     ),
     hour = floor(as.numeric(`TIME OCC`) / 100),
+    period = case_when(
+      hour >= 6 & hour < 12 ~ "Morning",
+      hour >= 12 & hour < 18 ~ "Afternoon",
+      hour >= 18 & hour < 24 ~ "Night",
+      (hour >= 0 & hour < 6) | hour == 24 ~ "Late Night"
+    ),
     `AREA NAME` = toupper(`AREA NAME`),
     `AREA NAME` = case_when(
       `AREA NAME` == "N HOLLYWOOD" ~ "NORTH HOLLYWOOD",
@@ -85,7 +91,7 @@ MosaicData_Loader <- function() {
   CD %>% 
     select(., c(Severity, weapon_usage, crime_status, 
                 vict_sex, `AREA NAME`, `Dur Rptd`,
-                vict_descent, vict_age, cat_dur_rptd)) -> Mosaic.CD
+                vict_descent, vict_age, cat_dur_rptd, period)) -> Mosaic.CD
   return(Mosaic.CD)
 }
 

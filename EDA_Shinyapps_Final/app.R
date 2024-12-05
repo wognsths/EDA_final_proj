@@ -6,6 +6,8 @@ Mosaic.CD <- MosaicData_Loader()
 crime_groups_choices <- Geo.CD$Crm.Cd.Group %>% unique() %>% sort()
 AREA_NAME <- Mosaic.CD$`AREA NAME` %>% unique()
 DEC <- Geo.CD$`vict_descent` %>% unique()
+# DEC.2 만들어서 모자이크 플랏 이쁘게 만들기
+# 데이터 필더링 하다가 페이지1거가 페이지2에 반영되는 경우 있음
 time_choices <- c("Morning", "Afternoon", "Night", "Late Night")
 
 ui <- navbarPage(
@@ -274,17 +276,43 @@ ui <- navbarPage(
           )
         ),
         conditionalPanel(
-          condition = "input.additionalplots == 'crime_proportion'"
+          condition = "input.additionalplots == 'crime_proportion'",
+          selectInput(
+            inputId = "selected_periods",
+            label = "Select Time Period(s):",
+            choices = time_choices,
+            selected = time_choices
+          ),
+          selectInput(
+            inputId = "crime_for_time",
+            label = "Select Crime Group:",
+            choices = crime_groups_choices,
+            selected = crime_groups_choices[1]
+          )
         ),
-        selectInput(
-          inputId = "selected_periods",
-          label = "Select Time Period(s):",
-          choices = time_choices,
-          selected = time_choices
+        conditionalPanel(
+          condition = "input.additionalplots == 'crime_socioeco'",
+          selectInput(
+            inputId = "factor_choice",
+            label = "Select Factor for Comparison",
+            choices = list(
+              "Median Income" = "median_household_income",
+              "Unemployment Rate" = "unemployment",
+              "Poverty Gap" = "gap"
+            )
+          )
         )
       ),
       mainPanel(
-        plotOutput("additionalPlot")
+        conditionalPanel(
+          condition = "input.additionalplots == 'crime_proportion'",
+          plotOutput("plot1"),
+          plotOutput("plot2")
+        ),
+        conditionalPanel(
+          condition = "input.additionalplots != 'crime_proportion'",
+          plotOutput("additionalPlot")
+        )
       )
     )
   ),
@@ -292,7 +320,7 @@ ui <- navbarPage(
   # Page 3
   tabPanel(
     "Page 3",
-    h3("Page 3 Content Goes Here"),
+    h3("Page 3 Content Goes Here")
     # Add your content for Page 3 here
   )
 )
@@ -504,6 +532,11 @@ server <- function(input, output, session) {
     }
     return(data)
   })
+  
+  filteredData.Page2.1 <- reactive({
+    data <- Geo.CD %>% select(., c(period, Crm.Cd.Group, `Dur Rptd`, L1_dist, L2_dist))
+  })
+  
   output$additionalPlot <- renderPlot({
     if (input$additionalplots == "mosaic") {
       data <- filteredData.Page2()
@@ -576,7 +609,7 @@ server <- function(input, output, session) {
       }
       
     } else if (input$additionalplots == "crime") {
-      data <- filteredData() %>%
+      data <- filteredData.Page2.1() %>%
         select(., c(Crm.Cd.Group, `Dur Rptd`, input$dist_metric)) %>%
         filter(., Crm.Cd.Group == input$select_crime)
       
@@ -646,13 +679,81 @@ server <- function(input, output, session) {
           theme_minimal()
       }
       print(plot)
-    } else if (input$additionalplots == "crime_proportion") {
-      print("ddd")
+    } else if (input$additionalplots == "crime_socioeco") {
+      
+      area_crime <- CD %>%
+        group_by(`AREA NAME`) %>%
+        count(name = "n") %>%
+        left_join(zipcodes_final, by = "AREA NAME") %>%
+        mutate(CrimePerPopulation = n / Total_population,
+               unemployment = Total_unemployed / (Total_employed + Total_unemployed),
+               gap = (poverty_under_50 + poverty_50_to_99 + poverty_100_to_124) / poverty_200_and_over)
+      
+      plot <- ggplot(area_crime, aes_string(x = input$factor_choice, y = "CrimePerPopulation")) +
+        geom_point() +
+        geom_smooth(method = "loess", span = 1, se = FALSE) +
+        labs(
+          title = paste("Crime Per Population vs", input$factor_choice),
+          x = input$factor_choice,
+          y = "Crime Per Population"
+        ) +
+        theme_minimal()
+      print(plot)
     }
   })
-  
-  
-  
+    
+    output$plot1 <- renderPlot({
+      if (input$additionalplots == "crime_proportion") {
+        data <- filteredData.Page2.1() %>%
+          select(., c(period, Crm.Cd.Group))
+        
+        total_count <- CD %>%
+          group_by(Crm.Cd.Group) %>%
+          count(name = "total_n")
+        
+        time_comp <- data %>%
+          filter(period %in% input$selected_periods) %>%
+          group_by(Crm.Cd.Group) %>%
+          count(name = "n") %>%
+          left_join(total_count, by = "Crm.Cd.Group") %>%
+          mutate(prop = n / total_n)
+        
+        plot.1 <- ggplot(time_comp, aes(x = Crm.Cd.Group, y = prop, fill = Crm.Cd.Group)) +
+          geom_bar(stat = "identity") +
+          scale_fill_brewer(palette = "Set3") +
+          labs(
+            title = "Proportions by Selected Time Periods",
+            x = "Crime Group",
+            y = "Proportion"
+          ) +
+          theme_minimal()
+        
+        print(plot.1)
+      }
+    })
+    
+    output$plot2 <- renderPlot({
+      if (input$additionalplots == "crime_proportion") {
+        crime_time_data <- CD %>%
+          filter(Crm.Cd.Group == input$crime_for_time) %>%
+          group_by(period) %>%
+          count(name = "n") %>%
+          ungroup() %>%
+          mutate(prop = n / sum(n))
+        
+        plot.2 <- ggplot(crime_time_data, aes(x = "", y = prop, fill = period)) +
+          geom_bar(stat = "identity", width = 1) +
+          coord_polar("y", start = 0) +
+          scale_fill_brewer(palette = "Set3") +
+          labs(
+            title = paste("Crime Composition by Time: ", input$crime_for_time),
+            fill = "Time Period"
+          ) +
+          theme_void()
+        
+        print(plot.2)
+      }
+    })
 }
 
 # Run the application 
