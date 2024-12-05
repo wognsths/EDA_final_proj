@@ -452,3 +452,60 @@ ggplot(data = crime_2023_color, aes(x = LON, y = LAT, color = color_group)) +
 
 
 # pie chart로 visualize 시킨 후 범죄당 proportion 상위 5개 지역으로 뽑아보자...
+Mosaic.CD
+crime_groups_choices 
+AREA_NAME 
+DEC
+time_choices 
+CD
+Crime_Data %>% colnames()
+
+CD %>% colnames()
+
+
+ggplot(CD, aes(x= `Vict Age`, y= `Crm.Cd.Group`)) +
+  geom_point() +
+  theme_minimal()
+
+Mosaic.CD %>% colnames()
+addcd<-Mosaic.CD %>% select(c("vict_age", "vict_sex","vict_descent"))
+
+
+CD %>% select(c("Vict Age", "Vict Sex","Vict Descent", "Crm.Cd.Group"))
+
+
+
+CD %>% select(c("Vict Age","vict_age", "vict_sex","vict_descent", "Crm.Cd.Group"))
+
+ggplot(data = CD) +
+  geom_mosaic(aes(x = product(vict_age, Crm.Cd.Group), 
+                  fill = vict_age)) +
+  scale_fill_manual(values = c("turquoise3", "orange2","red")) +
+  theme_mosaic()
+
+ggplot(data = CD) +
+  geom_mosaic(aes(x = product(vict_sex, Crm.Cd.Group), 
+                  fill = vict_sex)) +
+  scale_fill_manual(values = c("turquoise3", "orange2","red")) +
+  theme_mosaic()
+
+ggplot(data = CD) +
+  geom_mosaic(aes(x = product(vict_descent, Crm.Cd.Group), 
+                  fill = vict_descent)) +
+  theme(
+    axis.title.x = element_blank(), # Remove x-axis title
+    axis.title.y = element_blank(),  # Remove y-axis title
+    legend.text = element_text(size = 0.8),  # Reduce the size of legend text
+    legend.title = element_text(size = 2) # Adjust the size of the legend title
+  ) +
+  theme_mosaic()
+
+
+
+
+
+
+
+
+
+
