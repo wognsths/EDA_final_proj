@@ -135,6 +135,7 @@ ui <- navbarPage(
           choices = list(
             "Mosaic Plot" = "mosaic",
             "Duration of Reported vs Distance Between Police Station" = "crime",
+            "Time Analysis" = "time_crime",
             "Density Plot (Duration of Reported)" = "density",
             "Crime Proportions by Time" = "crime_proportion",
             "Crime and Socioeconomic Factors" = "crime_socioeco"
@@ -161,6 +162,17 @@ ui <- navbarPage(
               "Duration of Reported vs Severity" = "plot6"
             ),
             selected = "plot1"
+          )
+        ),
+        conditionalPanel(
+          condition = "input.additionalplots == 'time_crime'",
+          radioButtons(
+            inputId = "time_div",
+            label = "Select Option",
+            choices = list(
+              "View by Time of Day (Morning, Afternoon, Evening, Late Night)" = "view_time",
+              "View by Hour" = "view_hour"
+            )
           )
         ),
         conditionalPanel(
@@ -304,15 +316,8 @@ ui <- navbarPage(
         )
       ),
       mainPanel(
-        conditionalPanel(
-          condition = "input.additionalplots == 'crime_proportion'",
-          plotOutput("plot1"),
-          plotOutput("plot2")
-        ),
-        conditionalPanel(
-          condition = "input.additionalplots != 'crime_proportion'",
-          plotOutput("additionalPlot")
-        )
+        plotOutput("additionalPlot"),
+        plotOutput("additionalPlot2")
       )
     )
   ),
@@ -699,40 +704,63 @@ server <- function(input, output, session) {
         ) +
         theme_minimal()
       print(plot)
+    } else if (input$additionalplots == "crime_proportion") {
+      data <- filteredData.Page2.1() %>%
+        select(., c(period, Crm.Cd.Group))
+      
+      total_count <- CD %>%
+        group_by(Crm.Cd.Group) %>%
+        count(name = "total_n")
+      
+      time_comp <- data %>%
+        filter(period %in% input$selected_periods) %>%
+        group_by(Crm.Cd.Group) %>%
+        count(name = "n") %>%
+        left_join(total_count, by = "Crm.Cd.Group") %>%
+        mutate(prop = n / total_n)
+      
+      plot.1 <- ggplot(time_comp, aes(x = Crm.Cd.Group, y = prop, fill = Crm.Cd.Group)) +
+        geom_bar(stat = "identity") +
+        scale_fill_brewer(palette = "Set3") +
+        labs(
+          title = "Proportions by Selected Time Periods",
+          x = "Crime Group",
+          y = "Proportion"
+        ) +
+        theme_minimal()
+      
+      print(plot.1)
+      
+    } else if (input$additionalplots == "time_crime") {
+      data <- filteredData.Page2() %>%
+        select(., c(hour, period, `Dur Rptd`)) %>%
+        mutate(hour = factor(hour, levels = 0:23),
+               period = factor(period, levels = time_choices)) %>%
+        filter(`Dur Rptd` > 1)
+      
+      if (input$time_div == "view_time") {
+        plot.1 <- ggplot(data, aes(x = period, y = log(`Dur Rptd`))) +
+          geom_violin(trim = FALSE, fill = "lightblue") +
+          xlab("Time of Day") +
+          ylab("Log-transformated Duration of Report") +
+          labs("Violinplot of Duration of Report (above 1 day), by Time of Day") +
+          theme_minimal()
+        
+      } else {
+        plot.1 <- ggplot(data, aes(x = hour, y = log(`Dur Rptd`))) +
+          geom_violin(trim = FALSE, fill = "lightblue") +
+          xlab("Hour") +
+          ylab("Log-transformated Duration of Report") +
+          labs("Violinplot of Duration of Report (above 1 day), by Hour") +
+          theme_minimal()
+      }
+      
+      print(plot.1)
     }
   })
     
-    output$plot1 <- renderPlot({
-      if (input$additionalplots == "crime_proportion") {
-        data <- filteredData.Page2.1() %>%
-          select(., c(period, Crm.Cd.Group))
-        
-        total_count <- CD %>%
-          group_by(Crm.Cd.Group) %>%
-          count(name = "total_n")
-        
-        time_comp <- data %>%
-          filter(period %in% input$selected_periods) %>%
-          group_by(Crm.Cd.Group) %>%
-          count(name = "n") %>%
-          left_join(total_count, by = "Crm.Cd.Group") %>%
-          mutate(prop = n / total_n)
-        
-        plot.1 <- ggplot(time_comp, aes(x = Crm.Cd.Group, y = prop, fill = Crm.Cd.Group)) +
-          geom_bar(stat = "identity") +
-          scale_fill_brewer(palette = "Set3") +
-          labs(
-            title = "Proportions by Selected Time Periods",
-            x = "Crime Group",
-            y = "Proportion"
-          ) +
-          theme_minimal()
-        
-        print(plot.1)
-      }
-    })
     
-    output$plot2 <- renderPlot({
+    output$additionalPlot2 <- renderPlot({
       if (input$additionalplots == "crime_proportion") {
         crime_time_data <- CD %>%
           filter(Crm.Cd.Group == input$crime_for_time) %>%
@@ -750,6 +778,44 @@ server <- function(input, output, session) {
             fill = "Time Period"
           ) +
           theme_void()
+        
+        print(plot.2)
+      } else if (input$additionalplots == "time_crime") {
+        data <- filteredData.Page2() %>%
+          select(., c(hour, period, `Dur Rptd`)) %>%
+          mutate(hour = factor(hour, levels = 0:23),
+                 period = factor(period, levels = time_choices))
+        
+        t <- data %>% group_by(period) %>% count(name = "sum")
+        tt <- data %>% group_by(hour) %>% count(name = "sum")
+        
+        if (input$time_div == "view_time") {
+          data.1 <- data %>% filter(., `Dur Rptd` <= 1) %>%
+            group_by(period) %>% count(name = "n") %>%
+            left_join(t, by = "period") %>%
+            mutate(ratio = n / sum)
+          
+          
+          plot.2 <- ggplot(data.1, aes(x = period, y = ratio)) +
+            geom_bar(stat = "identity") +
+            xlab("Time of Day") +
+            ylab("Ratio") +
+            title("Ratio of Same-Day Reported Crimes by Time of Day") +
+            theme_minimal()
+          
+        } else {
+          data.1 <- data %>% filter(., `Dur Rptd` <= 1) %>%
+            group_by(hour) %>% count(name = "n") %>%
+            left_join(tt, by = "hour") %>%
+            mutate(ratio = n / sum)
+          
+          plot.2 <- ggplot(data.1, aes(x = hour, y = ratio)) +
+            geom_bar(stat = "identity") +
+            xlab("Hour") +
+            ylab("Ratio") +
+            title("Ratio of Same-Day Reported Crimes by Hour") +
+            theme_minimal()
+        }
         
         print(plot.2)
       }
