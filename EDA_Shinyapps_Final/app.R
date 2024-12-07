@@ -1,4 +1,4 @@
-library(shiny)
+library(shiny);library(plotly)
 source("~/EDA_final_proj/data_prep.R")
 
 Geo.CD <- GeoData_Loader()
@@ -7,7 +7,7 @@ crime_groups_choices <- Geo.CD$Crm.Cd.Group %>% unique() %>% sort()
 AREA_NAME <- Mosaic.CD$`AREA NAME` %>% unique()
 DEC <- Geo.CD$`vict_descent` %>% unique()
 # DEC.2 만들어서 모자이크 플랏 이쁘게 만들기
-# 데이터 필더링 하다가 페이지1거가 페이지2에 반영되는 경우 있음
+
 time_choices <- c("Morning", "Afternoon", "Night", "Late Night")
 
 ui <- navbarPage(
@@ -321,12 +321,21 @@ ui <- navbarPage(
       )
     )
   ),
-  
-  # Page 3
   tabPanel(
     "Page 3",
-    h3("Page 3 Content Goes Here")
-    # Add your content for Page 3 here
+    sidebarLayout(
+      sidebarPanel(
+        selectInput("selection", 
+                    "EDA1",
+                    choices = list("id1" = "id1",
+                                   "id2" = "id2"))
+      ),
+      mainPanel(
+        plotlyOutput("map", width = "100%", height = "600px"),
+        h4("Selected Area Info"),
+        verbatimTextOutput("clickInfo")
+      )
+    )
   )
 )
 
@@ -336,10 +345,11 @@ server <- function(input, output, session) {
   capturedPlot <- reactiveVal(NULL)
   
   observe({
-    if (input$use_end && input$end_dur < input$start_dur) {
-      updateNumericInput(session, "end_dur", value = input$start_dur)
-    }
-  })
+  req(input$use_end, input$end_dur, input$start_dur)
+  if (input$use_end && input$end_dur < input$start_dur) {
+    updateNumericInput(session, "end_dur", value = input$start_dur)
+  }
+})
   
   observeEvent(input$crime_percentage_plot_show, {
     if (input$crime_percentage_plot_show) {
@@ -818,6 +828,39 @@ server <- function(input, output, session) {
         }
         
         print(plot.2)
+      }
+    })
+    
+    p <- ggplot(boundary_df) +
+      geom_polygon(aes(x=long, y=lat, group=group, fill=id), color="white") +
+      scale_fill_manual(values = rep("grey90", length(unique(boundary_df$id))), guide="none") +
+      coord_equal() +
+      theme_bw() +
+      theme(
+        legend.position="none",
+        axis.text=element_blank(),
+        axis.title=element_blank(),
+        axis.ticks=element_blank(),
+        panel.grid=element_blank(),       # 그리드 제거
+        panel.background=element_rect(fill="white"),
+        plot.background=element_rect(fill="white"),
+        panel.border=element_rect(color="black", fill=NA, size=1)
+      )
+    
+    output$map <- renderPlotly({
+      g <- ggplotly(p, tooltip="id") %>%
+        layout(dragmode="pan") %>%
+        event_register("plotly_click") %>%
+        highlight(on="plotly_click", opacityDim=0.5, selected=attrs_selected(fillcolor="blue"))
+      g
+    })
+    
+    output$clickInfo <- renderPrint({
+      d <- event_data("plotly_click", source="myPlot")
+      if (!is.null(d)) {
+        cat("Clicked Region:\n", d$key, "\n")
+      } else {
+        "Select Region."
       }
     })
 }
