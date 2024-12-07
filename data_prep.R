@@ -1,11 +1,28 @@
 ## This file is for data analysis & data loaders
-library(tidyverse);library(ggplot2);library(sf);library(lubridate)
-library(data.table);library(RColorBrewer);library(ggmosaic);library(gridExtra)
+library(tidyverse);library(ggplot2);library(sf);library(lubridate);library(dplyr)
+library(data.table);library(RColorBrewer);library(ggmosaic);library(gridExtra);library(plotly)
 
 Crime_Data <- read_csv("Crime_Data_from_2020_to_Present.csv")
 zipcodes_final <- read_csv("zipcodes_final.csv") # to be added differently
 Police_station <- read_csv("Sheriff_and_Police_Stations.csv")
 boundary <- st_read("LAPD_Div/LAPD_Divisions.shp")
+
+boundary.1 <- boundary %>% mutate(id = as.character(APREC))
+boundary <- st_cast(boundary.1, "POLYGON")
+boundary_df <- do.call(rbind, lapply(1:nrow(boundary), function(i) {
+  poly <- boundary[i,]
+  coords <- st_coordinates(poly) # X, Y, ..., L1, L2
+  # coords에서 X, Y 추출
+  data.frame(
+    id = poly$id,
+    long = coords[,1],
+    lat = coords[,2],
+    # group 컬럼은 id 기반으로 설정 (한 id 내에 멀티폴리곤 있으면 L2 포함해서 구분 필요)
+    group = paste0(poly$id, "_", if("L2" %in% colnames(coords)) coords[,"L2"] else 1),
+    stringsAsFactors = FALSE
+  )
+}))
+
 boundary <- st_transform(boundary, crs = 4326)
 
 CD <- Crime_Data %>%
@@ -91,7 +108,7 @@ MosaicData_Loader <- function() {
   CD %>% 
     select(., c(Severity, weapon_usage, crime_status, 
                 vict_sex, `AREA NAME`, `Dur Rptd`,
-                vict_descent, vict_age, cat_dur_rptd, period)) -> Mosaic.CD
+                vict_descent, vict_age, cat_dur_rptd, period, hour)) -> Mosaic.CD
   return(Mosaic.CD)
 }
 
