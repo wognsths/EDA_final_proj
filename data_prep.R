@@ -1,6 +1,6 @@
 ## This file is for data analysis & data loaders
 library(tidyverse);library(ggplot2);library(sf);library(lubridate);library(dplyr)
-library(data.table);library(RColorBrewer);library(ggmosaic);library(gridExtra);library(plotly)
+library(data.table);library(RColorBrewer);library(ggmosaic);library(gridExtra);library(plotly);library(kableExtra)
 
 Crime_Data <- read_csv("Crime_Data_from_2020_to_Present.csv")
 zipcodes_final <- read_csv("zipcodes_final.csv") # to be added differently
@@ -90,6 +90,32 @@ CD <- Crime_Data %>%
                'Mocodes', 'Status', `Status Desc`, `Crm Cd 1`, `Crm Cd 2`,
                `Crm Cd 3`, `Crm Cd 4`, 'LOCATION', `Cross Street`, 'OCC_year',
                `Premis Cd`, `Premis Desc`, `Weapon Desc`, `Weapon Used Cd`))
+
+mapping <- c(
+  "AGG.ASSAULTS" = "ASSAULT",
+  "BURG.THEFT.FROMVEICHLE" = "BURGLARY THEFT FROM VEICHLE",
+  "BURGLARY" = "BURGLARY",
+  "HOMICIDE" = "HOMICIDE",
+  "OTHER.THEFT" = "OTHER THEFT",
+  "PART2 Crime" = "LESS SEVERE CRIME",
+  "PERSONAL.THEFT" = "PERSONAL THEFT",
+  "RAPE" = "RAPE",
+  "ROBBERY" = "ROBBERY",
+  "VEICHLE.THEFT" = "VEHICLE THEFT"
+)
+
+CD <- CD %>%
+  mutate(Crm.Cd.Group = recode(Crm.Cd.Group, !!!mapping))
+
+
+
+daily_crime_by_area <- CD %>% 
+  group_by(`AREA NAME`) %>%
+  count(name = "total_crime") %>%
+  left_join(zipcodes_final, by = "AREA NAME") %>%
+  mutate(dailycrimepercent = total_crime / Total_population / 365 * 100) %>%
+  rename(AREA_NAME = `AREA NAME`) %>%
+  select(AREA_NAME, dailycrimepercent, total_crime)
 
 ### DATALOADER ###
 GeoData_Loader <- function() {
