@@ -1114,6 +1114,7 @@ server <- function(input, output, session) {
           y = "Crime Per Population"
         ) +
         theme_minimal()
+        
       print(plot)
     } else if (input$additionalplots == "crime_proportion") {
       data <- filteredData.Page2.1() %>%
@@ -1138,7 +1139,8 @@ server <- function(input, output, session) {
           x = "Crime Group",
           y = "Proportion"
         ) +
-        theme_minimal()
+        theme_minimal() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1))
       
       print(plot.1)
       
@@ -1299,7 +1301,7 @@ server <- function(input, output, session) {
           
           output_text <- paste0(
             "Selected Region:\n", sr, "\n",
-            "Daily Crime Probability per 100 people:\n", as.character(percent_val), "%",
+            "Daily Crime Probability per 1 people:\n", as.character(percent_val), "%",
             "\n(Derived as [(Total Crime / Population / 365) * 100])",
             "\nDon't worry! The actual crime likelihood is calculated by multiplying SELECTED AREA's crime probability."
           )
@@ -1323,7 +1325,6 @@ server <- function(input, output, session) {
 
       prob_logit <- predict(multi_logit_model, newdata = new_data, type = "prob") %>% as.vector()
       names(prob_logit) <- levels(train_data$Crm.Cd.Group)
-      print(prob_logit)
       prob_rf <- predict(rf_model, newdata = new_data, type = "prob") %>% as.vector()
       names(prob_rf) <- levels(train_data$Crm.Cd.Group)
       
