@@ -1,8 +1,47 @@
-library(shiny);library(plotly);library(randomForest);library(xgboost);library(nnet);library(caret)
-source("~/EDA_final_proj/data_prep.R")
+library(shiny);library(plotly)
+library(tidyr);library(ggplot2);library(sf);library(lubridate);library(dplyr);library(readr)
+library(data.table);library(RColorBrewer);library(ggmosaic);library(gridExtra);library(plotly);library(kableExtra)
+# source("data_prep.R")
 
-Geo.CD <- GeoData_Loader()
-Mosaic.CD <- MosaicData_Loader()
+### READ FILES ###
+Geo.CD <- readRDS("Geo_CD.rds")
+Mosaic.CD <-readRDS("Mosaic_CD.rds")
+CD <- readRDS("CD.rds")
+precomputed_df <- readRDS("all_predictions.rds")
+zipcodes_final <- read_csv("zipcodes_final.csv")
+Police_station <- read_csv("Sheriff_and_Police_Stations.csv")
+boundary <- st_read("LAPD_Div/LAPD_Divisions.shp")
+
+### SOME HANDLINGS... ###
+boundary <- st_transform(boundary, crs = 4326)
+boundary.1 <- boundary %>% mutate(id = as.character(APREC))
+boundary <- st_cast(boundary.1, "POLYGON")
+boundary_df <- do.call(rbind, lapply(1:nrow(boundary), function(i) {
+  poly <- boundary[i,]
+  coords <- st_coordinates(poly)
+  data.frame(
+    id = poly$id,
+    long = coords[,1],
+    lat = coords[,2],
+    group = paste0(poly$id, "_", if("L2" %in% colnames(coords)) coords[,"L2"] else 1),
+    stringsAsFactors = FALSE
+  )
+}))
+
+daily_crime_by_area <- CD %>% 
+  group_by(`AREA NAME`) %>%
+  count(name = "total_crime") %>%
+  left_join(zipcodes_final, by = "AREA NAME") %>%
+  mutate(dailycrimepercent = total_crime / Total_population / 365 * 100) %>%
+  rename(AREA_NAME = `AREA NAME`) %>%
+  select(AREA_NAME, dailycrimepercent, total_crime)
+
+### WE SUBSITUTED THESE FILE BY ### precomputed_df <- readRDS("all_predictions.rds")  ###
+
+# multi_logit_model <- readRDS("multi_logit_model.rds")
+# xgb_model <- readRDS("xgb_model.rds")
+# rf_model <- readRDS("rf_model.rds")
+
 crime_groups_choices <- Geo.CD$Crm.Cd.Group %>% unique() %>% sort()
 AREA_NAME <- Mosaic.CD$`AREA NAME` %>% unique()
 DEC <- Geo.CD$`vict_descent` %>% unique()
@@ -11,12 +50,10 @@ time_choices <- c("Morning", "Afternoon", "Night", "Late Night")
 vict_age_choices <- c("Youth (0~14)", "Adult (15~64)", "Elderly (65~)")
 vict_sex_choices <- c("M", "F")
 
-multi_logit_model <- readRDS("multi_logit_model.rds")
-xgb_model <- readRDS("xgb_model.rds")
-rf_model <- readRDS("rf_model.rds")
 train_data <- CD %>%
   select(Crm.Cd.Group, `AREA NAME`, vict_age, vict_sex, vict_descent, period) %>%
   rename(AREA_NAME = `AREA NAME`)
+
 train_data$AREA_NAME <- as.factor(train_data$AREA_NAME)
 train_data$vict_age <- as.factor(train_data$vict_age)
 train_data$vict_sex <- as.factor(train_data$vict_sex)
@@ -457,7 +494,6 @@ server <- function(input, output, session) {
              Severity %in% input$severity,
              vict_descent %in% input$select_descent)
   })
-  print(filteredData %>% dim())
   
   currentPlot <- reactive({
     Cd_filtered <- filteredData()
@@ -1322,39 +1358,45 @@ server <- function(input, output, session) {
         vict_descent = factor(input$model_descent, levels = levels(train_data$vict_descent)),
         period = factor(input$model_period, levels = levels(train_data$period))
       )
-
-      prob_logit <- predict(multi_logit_model, newdata = new_data, type = "prob") %>% as.vector()
-      names(prob_logit) <- levels(train_data$Crm.Cd.Group)
-      prob_rf <- predict(rf_model, newdata = new_data, type = "prob") %>% as.vector()
-      names(prob_rf) <- levels(train_data$Crm.Cd.Group)
       
+      matched_row <- precomputed_df %>%
+        filter(AREA_NAME == new_data$AREA_NAME,
+               vict_age == new_data$vict_age,
+               vict_sex == new_data$vict_sex,
+               vict_descent == new_data$vict_descent,
+               period == new_data$period)
       
+      logit_probs <- matched_row %>% select(starts_with("Logit_")) %>% as.numeric()
+      names(logit_probs) <- gsub("Logit_", "", colnames(matched_row %>% select(starts_with("Logit_"))))
       
-      dmy <- dummyVars("~ AREA_NAME + vict_age + vict_sex + vict_descent + period", data = train_data)
-      new_x <- data.frame(predict(dmy, newdata = new_data))
-      dnew <- xgb.DMatrix(data = as.matrix(new_x))
-      pred_xgb <- predict(xgb_model, dnew) %>% as.vector()
-      names(pred_xgb) <- levels(train_data$Crm.Cd.Group)
+      rf_probs <- matched_row %>% select(starts_with("RF_")) %>% as.numeric()
+      names(rf_probs) <- gsub("RF_", "", colnames(matched_row %>% select(starts_with("RF_"))))
+      
+      xgb_probs <- matched_row %>% select(starts_with("XGB_")) %>% as.numeric()
+      names(xgb_probs) <- gsub("XGB_", "", colnames(matched_row %>% select(starts_with("XGB_"))))
       
       df_logit <- data.frame(
         Model = "Multinomial_Logit",
-        Crime_Group = names(prob_logit),
-        Probability = prob_logit
+        Crime_Group = names(logit_probs),
+        Probability = logit_probs,
+        stringsAsFactors = FALSE
       )
       
       df_rf <- data.frame(
         Model = "Random_Forest",
-        Crime_Group = names(prob_rf),
-        Probability = prob_rf
+        Crime_Group = names(rf_probs),
+        Probability = rf_probs,
+        stringsAsFactors = FALSE
       )
       
       df_xgb <- data.frame(
         Model = "XGBoost",
-        Crime_Group = names(pred_xgb),
-        Probability = pred_xgb
+        Crime_Group = names(xgb_probs),
+        Probability = xgb_probs,
+        stringsAsFactors = FALSE
       )
       
-      result_df <- rbind(df_logit, df_rf, df_xgb) %>%
+      result_df <- bind_rows(df_logit, df_rf, df_xgb) %>%
         pivot_wider(
           names_from = Crime_Group,
           values_from = Probability
