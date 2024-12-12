@@ -2,26 +2,11 @@
 library(tidyr);library(ggplot2);library(sf);library(lubridate);library(dplyr);library(readr)
 library(data.table);library(RColorBrewer);library(ggmosaic);library(gridExtra);library(plotly);library(kableExtra)
 
-Crime_Data <- read_csv("Crime_Data_2023.csv")
-zipcodes_final <- read_csv("zipcodes_final.csv") # to be added differently
-Police_station <- read_csv("Sheriff_and_Police_Stations.csv")
-boundary <- st_read("LAPD_Div/LAPD_Divisions.shp")
+# 기존 Crime_Data는 아래와 같습니다.
+# Crime_Data <- read_csv("Crime_Data_from_2020_to_Present.csv")
 
-boundary.1 <- boundary %>% mutate(id = as.character(APREC))
-boundary <- st_cast(boundary.1, "POLYGON")
-boundary_df <- do.call(rbind, lapply(1:nrow(boundary), function(i) {
-  poly <- boundary[i,]
-  coords <- st_coordinates(poly) # X, Y, ..., L1, L2
-  # coords에서 X, Y 추출
-  data.frame(
-    id = poly$id,
-    long = coords[,1],
-    lat = coords[,2],
-    # group 컬럼은 id 기반으로 설정 (한 id 내에 멀티폴리곤 있으면 L2 포함해서 구분 필요)
-    group = paste0(poly$id, "_", if("L2" %in% colnames(coords)) coords[,"L2"] else 1),
-    stringsAsFactors = FALSE
-  )
-}))
+Crime_Data <- read_csv("Crime_Data_2023.csv")
+Police_station <- read_csv("Sheriff_and_Police_Stations.csv")
 
 boundary <- st_transform(boundary, crs = 4326)
 
@@ -91,62 +76,7 @@ CD <- Crime_Data %>%
                `Crm Cd 3`, `Crm Cd 4`, 'LOCATION', `Cross Street`, 'OCC_year',
                `Premis Cd`, `Premis Desc`, `Weapon Desc`, `Weapon Used Cd`))
 
-daily_crime_by_area <- CD %>% 
-  group_by(`AREA NAME`) %>%
-  count(name = "total_crime") %>%
-  left_join(zipcodes_final, by = "AREA NAME") %>%
-  mutate(dailycrimepercent = total_crime / Total_population / 365 * 100) %>%
-  rename(AREA_NAME = `AREA NAME`) %>%
-  select(AREA_NAME, dailycrimepercent, total_crime)
-
-mapping <- c(
-  "AGG.ASSAULTS" = "ASSAULT",
-  "BURG.THEFT.FROMVEICHLE" = "BURGLARY_THEFT_FROM_VEICHLE",
-  "BURGLARY" = "BURGLARY",
-  "HOMICIDE" = "HOMICIDE",
-  "OTHER.THEFT" = "OTHER_THEFT",
-  "PART2 Crime" = "LESS_SEVERE_CRIME",
-  "PERSONAL.THEFT" = "PERSONAL_THEFT",
-  "RAPE" = "RAPE",
-  "ROBBERY" = "ROBBERY",
-  "VEICHLE.THEFT" = "VEHICLE_THEFT"
-)
-
-### DATALOADER ###
-GeoData_Loader <- function() {
-  CD %>% filter(LAT != 0, LON != 0, `Dur Rptd` >= 0) -> Geo.CD
-  
-  PD_data <- Police_station %>% select(., c(latitude, longitude))
-  Geo.CD %>% mutate(
-    L1_dist = Distance_Calculator(PD_data, Geo.CD %>% select(.,c(LAT, LON)), 1) %>% apply(.,1,min),
-    L2_dist = Distance_Calculator(PD_data, Geo.CD %>% select(.,c(LAT, LON)), 2) %>% apply(.,1,min)
-  ) -> Geo.CD
-  
-  return(Geo.CD)
-}
-
-MosaicData_Loader <- function() {
-  CD %>% 
-    select(., c(Severity, weapon_usage, crime_status, 
-                vict_sex, `AREA NAME`, `Dur Rptd`,
-                vict_descent, vict_age, cat_dur_rptd, period, hour)) -> Mosaic.CD
-  return(Mosaic.CD)
-}
-
-Geo_CD <- GeoData_Loader()
-Mosaic_CD <- MosaicData_Loader()
-
-CD <- CD %>%
-  mutate(Crm.Cd.Group = recode(Crm.Cd.Group, !!!mapping))
-Geo_CD <- Geo_CD %>%
-  mutate(Crm.Cd.Group = recode(Crm.Cd.Group, !!!mapping))
-
-saveRDS(Geo_CD, "Geo_CD.rds")
-saveRDS(CD, "CD.rds")
-saveRDS(Mosaic_CD, "Mosaic_CD.rds")
-
-### Other Functions / Data Tables for Data Analysis ###
-
+### DISTANCE FUNCTION ###
 Distance_Calculator <- function(Criteria_point, Data, option = 2) {
   Data <- as.matrix(Data)
   Criteria_point <- as.matrix(Criteria_point)
@@ -195,3 +125,52 @@ Distance_Calculator <- function(Criteria_point, Data, option = 2) {
     stop("Invalid option. Choose 1 for Manhattan distance or 2 for Euclidean distance.")
   }
 }
+
+### DATALOADER ###
+GeoData_Loader <- function() {
+  CD %>% filter(LAT != 0, LON != 0, `Dur Rptd` >= 0) -> Geo.CD
+  
+  PD_data <- Police_station %>% select(., c(latitude, longitude))
+  Geo.CD %>% mutate(
+    L1_dist = Distance_Calculator(PD_data, Geo.CD %>% select(.,c(LAT, LON)), 1) %>% apply(.,1,min),
+    L2_dist = Distance_Calculator(PD_data, Geo.CD %>% select(.,c(LAT, LON)), 2) %>% apply(.,1,min)
+  ) -> Geo.CD
+  
+  return(Geo.CD)
+}
+
+MosaicData_Loader <- function() {
+  CD %>% 
+    select(., c(Severity, weapon_usage, crime_status, 
+                vict_sex, `AREA NAME`, `Dur Rptd`,
+                vict_descent, vict_age, cat_dur_rptd, period, hour)) -> Mosaic.CD
+  return(Mosaic.CD)
+}
+
+Geo_CD <- GeoData_Loader()
+Mosaic_CD <- MosaicData_Loader()
+
+### 머신러닝 모델 호환을 위해 Recoding ###
+mapping <- c(
+  "AGG.ASSAULTS" = "ASSAULT",
+  "BURG.THEFT.FROMVEICHLE" = "BURGLARY_THEFT_FROM_VEICHLE",
+  "BURGLARY" = "BURGLARY",
+  "HOMICIDE" = "HOMICIDE",
+  "OTHER.THEFT" = "OTHER_THEFT",
+  "PART2 Crime" = "LESS_SEVERE_CRIME",
+  "PERSONAL.THEFT" = "PERSONAL_THEFT",
+  "RAPE" = "RAPE",
+  "ROBBERY" = "ROBBERY",
+  "VEICHLE.THEFT" = "VEHICLE_THEFT"
+)
+
+CD <- CD %>%
+  mutate(Crm.Cd.Group = recode(Crm.Cd.Group, !!!mapping))
+Geo_CD <- Geo_CD %>%
+  mutate(Crm.Cd.Group = recode(Crm.Cd.Group, !!!mapping))
+
+
+### SAVE FILES ###
+saveRDS(Geo_CD, "Geo_CD.rds")
+saveRDS(CD, "CD.rds")
+saveRDS(Mosaic_CD, "Mosaic_CD.rds")

@@ -4,7 +4,7 @@ library(xgboost)
 library(randomForest)
 library(nnet)
 
-source("~/EDA_final_proj/data_prep.R")
+# source("~/EDA_final_proj/data_prep.R")
 
 data <- CD %>%
   select(Crm.Cd.Group, `AREA NAME`, vict_age, vict_sex, vict_descent, period) %>%
@@ -71,6 +71,8 @@ head(pred_rf) # 각 범죄 그룹별 확률
 pred_rf_class <- predict(rf_model, newdata=test, type="response")
 confusionMatrix(pred_rf_class, test$Crm.Cd.Group)
 
-saveRDS(multi_logit_model, file = "~/EDA_final_proj/EDA_Shinyapps_Final/multi_logit_model.rds")
-saveRDS(xgb_model, file = "~/EDA_final_proj/EDA_Shinyapps_Final/xgb_model.rds")
-saveRDS(rf_model, file = "~/EDA_final_proj/EDA_Shinyapps_Final/rf_model.rds")
+
+## File save
+# saveRDS(multi_logit_model, file = "~/EDA_final_proj/EDA_Shinyapps_Final/multi_logit_model.rds")
+# saveRDS(xgb_model, file = "~/EDA_final_proj/EDA_Shinyapps_Final/xgb_model.rds")
+# saveRDS(rf_model, file = "~/EDA_final_proj/EDA_Shinyapps_Final/rf_model.rds")
